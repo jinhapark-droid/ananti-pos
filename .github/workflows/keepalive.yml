@@ -1,0 +1,22 @@
+# Supabase 무료 프로젝트는 7일 동안 요청이 없으면 일시정지된다.
+# 3일마다 고객 영수증 조회 함수를 한 번 불러(없는 영수증 → 빈 결과) DB를 깨워 둔다. 비밀번호·데이터는 쓰지 않는다.
+name: Supabase keepalive
+
+on:
+  schedule:
+    - cron: "17 0 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            "https://owykoqnhwmdhpadxipes.supabase.co/rest/v1/rpc/pos_receipt" \
+            -H "apikey: sb_publishable_Pgf79543Sk1FvB_PtWK5PA_2U9jlGbD" \
+            -H "Content-Type: application/json" \
+            -d '{"p_token":"keepalive-ping-0000000"}')
+          echo "HTTP $code"
+          test "$code" = "200"
