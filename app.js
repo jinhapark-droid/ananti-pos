@@ -523,26 +523,38 @@ function shipLines() {
   for (const s of S.sales) s.items.forEach((it, i) => { if (it.type !== "pickup") out.push({ s, it, i, left: it.qty - it.cq }); });
   return out.sort((a, b) => a.s.ts - b.s.ts);
 }
-const SHIP_HEAD = ["매장", "주문번호", "주문일시", "판매유형", "수령자", "수령자 연락처", "주소", "배송메모", "상품코드", "상품명", "옵션", "수량", "판매금액", "발송 안내", "주문자", "주문자 연락처"];
-function shipRow(x, qty) {
+// 이지어드민 수기발주 양식 (Downloads/261109밀리밀_수기발주.xlsx와 같은 11열, Sheet1)
+// 같은 주문번호 = 합포. 주문번호는 양식처럼 날짜_매장코드+순번(POS C261127-001 → 261127_C001),
+// 사전구매는 끝에 P를 붙여 당일발송과 따로 묶이게 한다. 메모 = 판매일_매장명 출고.
+const SHIP_HEAD = ["발송일", "주문번호", "상품코드", "품목코드", "상품명", "옵션", "수량", "수령자명", "수령자전화번호", "수령자주소", "메모"];
+const shipDate = t => { const d = new Date(t); return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}`; };
+const yymmdd = t => dayKey(t).slice(2).replace(/-/g, "");
+const ezOrderNo = s => { const m = /^([A-Z]+)(\d{6})-(\d+)$/.exec(s.orderNo || ""); return m ? `${m[2]}_${m[1]}${m[3]}` : (s.orderNo || s.id); };
+function shipRow(x, qty, ts) {
   const s = x.s, it = x.it, sh = s.ship || {};
-  return [storeCfg().name, s.orderNo, full(s.ts), TYPES[it.type], sh.name || s.custName, sh.phone || s.custPhone, sh.addr || "", sh.memo || "", it.ez, it.name, `${it.color} / ${it.size}`, qty, Math.round(it.net / it.qty * qty), it.note || "", s.custName || "", s.custPhone || ""];
+  const memo = [`${yymmdd(s.ts)}_${storeCfg().name} 출고`, it.type === "pre" ? `사전구매 ${it.note || "입고 후 순차 발송"}` : "", sh.memo || ""].filter(Boolean).join(" / ");
+  return [shipDate(ts), ezOrderNo(s) + (it.type === "pre" ? "P" : ""), it.ez, "", `[26FW] ${it.name} ${it.color}`, it.size, qty, sh.name || s.custName || "", fmtPhone(sh.phone || s.custPhone), sh.addr || "", memo];
 }
-function shipBook(rows) {
-  const wb = XLSX.utils.book_new();
-  for (const [t, label] of [["ship", "당일발송(택배)"], ["pre", "사전구매"]]) {
-    const aoa = [SHIP_HEAD, ...rows.filter(r => r.x.it.type === t).map(r => shipRow(r.x, r.qty))];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    for (let r = 1; r < aoa.length; r++) { const ref = XLSX.utils.encode_cell({ r, c: 8 }); ws[ref].t = "s"; ws[ref].z = "@"; }
-    XLSX.utils.book_append_sheet(wb, ws, label);
-  }
+function shipBook(rows, ts) {
+  const aoa = [SHIP_HEAD, ...rows.map(r => shipRow(r.x, r.qty, ts))];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  for (let r = 1; r < aoa.length; r++) for (const c of [1, 2]) { const ref = XLSX.utils.encode_cell({ r, c }); ws[ref].t = "s"; ws[ref].z = "@"; }
+  ws["!cols"] = [10, 14, 10, 10, 44, 6, 6, 10, 15, 48, 30].map(wch => ({ wch }));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
   return XLSX.write(wb, { bookType: "xlsx", type: "array" });
+}
+// 당일발송·사전구매를 각각 별도 파일로 (이지어드민에 따로 올려 합포가 섞이지 않게)
+function saveShipFiles(rows, ts, tag) {
+  for (const [t, label] of [["ship", "택배"], ["pre", "사전구매"]]) {
+    const part = rows.filter(r => r.x.it.type === t);
+    if (part.length) saveFile(`${fileTag()}_수기발주_${label}_${tag}.xlsx`, shipBook(part, ts));
+  }
 }
 async function exportShip() {
   const todo = shipLines().filter(x => !x.it.exp && x.left > 0);
   if (!todo.length) { toast("새로 내보낼 택배·사전구매 건이 없어요."); return; }
   const batch = "B" + stamp(), ts = Date.now();
-  saveFile(`${fileTag()}_발주_${stamp()}.xlsx`, shipBook(todo.map(x => ({ x, qty: x.left }))));
+  saveShipFiles(todo.map(x => ({ x, qty: x.left })), ts, stamp());
   const bySale = {};
   for (const x of todo) (bySale[x.s.id] = bySale[x.s.id] || []).push(x);
   try {
@@ -556,7 +568,7 @@ async function exportShip() {
 }
 function reExportBatch(batch) {
   const rows = shipLines().filter(x => x.it.exp && x.it.exp.batch === batch).map(x => ({ x, qty: x.it.exp.qty }));
-  saveFile(`${fileTag()}_발주_${batch.slice(1)}_재다운로드.xlsx`, shipBook(rows));
+  if (rows.length) saveShipFiles(rows, rows[0].x.it.exp.ts, batch.slice(1) + "_재다운로드");
 }
 async function markEzCancelDone(sid, i) {
   const s = S.sales.find(y => y.id === sid), items = s.items.map(it => ({ ...it }));
@@ -806,7 +818,7 @@ function viewShip() {
     <div class="panel-h"><h2>배송 발주</h2>
       <div class="seg" role="group">${[["todo", "발주 대기"], ["done", "등록 완료"], ["cancel", "발주 취소 필요"]].map(([k, l]) => `<button data-act="ship-mode" data-m="${k}" aria-pressed="${m === k}">${l}</button>`).join("")}</div>
       <div class="filters spacer">${isHQ() ? `<button class="btn go" data-act="ship-export" ${todo.length ? "" : "disabled"}>발주 대기 ${todo.length}줄 엑셀로 내보내기</button>` : `<span class="note">발주 내보내기는 본사 계정에서 해요</span>`}</div></div>
-    <div class="panel-b note">엑셀은 ‘당일발송(택배)’과 ‘사전구매’ 시트로 나뉘어요. 내보낸 줄은 ‘등록 완료’로 바뀌어 다시 나가지 않아요(중복 발주 방지). 열 구성은 임시 양식이라 이지어드민 발주 양식을 받으면 맞춰 바꿀게요.</div>
+    <div class="panel-b note">이지어드민 수기발주 양식(발송일·주문번호·상품코드·품목코드·상품명·옵션·수량·수령자명·수령자전화번호·수령자주소·메모)으로 내보내요. 주문번호는 POS 번호를 양식 형태로 바꿔 넣고(C261127-001 → 261127_C001), 메모는 ‘판매일_매장명 출고’예요. 택배와 사전구매는 파일이 따로 나가고(사전구매 주문번호 끝에 P), 같은 주문번호끼리 합포돼요. 내보낸 줄은 ‘등록 완료’로 바뀌어 다시 나가지 않아요(중복 발주 방지).</div>
     <div class="scroll" style="max-height:60vh"><table>
       <thead><tr><th>주문번호</th><th>유형</th><th>수령자</th><th>주소</th><th>상품</th><th class="r">수량</th><th>상태</th><th></th></tr></thead>
       <tbody>${list.map(x => `<tr><td class="mono"><button class="btn sm" data-act="order" data-id="${x.s.id}">${esc(x.s.orderNo)}</button></td>
