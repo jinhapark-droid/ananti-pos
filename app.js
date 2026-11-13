@@ -116,7 +116,7 @@ function derive() {
   S.products = cat && Array.isArray(cat.products) ? cat.products : [];
   S.byBc = {}; S.byEz = {}; S.byCode = {};
   for (const p of S.products) { S.byBc[p.bc] = p; S.byEz[normEz(p.ez)] = p; S.byCode[String(p.code).toUpperCase()] = p; }
-  S.config = d["config/main"] || { stores: [{ id: "ananti", name: "아난티 팝업", code: "A" }], notes: {}, notice: "" };
+  S.config = d["config/main"] || { stores: [{ id: "chungcheong", name: "더현대 충청", code: "C" }], notes: {}, notice: "" };
   if (S.me && S.me.role === "store") S.store = S.me.store;
   if (!(S.config.stores || []).some(s => s.id === S.store)) S.store = ((S.config.stores || [])[0] || {}).id || "";
   ls("pos.store", S.store);
