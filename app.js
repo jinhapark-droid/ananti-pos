@@ -268,7 +268,7 @@ async function commitSale(f) {
     ts: now, day: dayKey(now), store: S.store, orderNo: nextOrderNo(now), rt: token(20), by: S.me.name, items,
     qty: pr.qty, gross: pr.gross, baseDisc: pr.baseDisc, promoDisc: pr.promoTotal, promoInfo: pr.hit ? { ...pr.promo } : null,
     excDisc: pr.excTotal, orderExc: S.orderExc ? { ...S.orderExc, amount: pr.orderExcAmt } : null, excWarn: pr.warn,
-    total: pr.total, paid: f.paid, memo: f.memo, custName: f.name, custPhone: f.phone,
+    total: pr.total, paid: f.paid, memo: f.memo, custName: f.name, custPhone: f.phone, hyundaiReceiptNo: f.hyundaiReceiptNo,
     ship: needShip ? { name: f.rname, phone: f.rphone, addr: f.addr, memo: f.smemo } : null,
     consent: needShip ? { ts: now, by: S.me.name } : null,
     cancels: [], status: "done", exchangeOf: S.exchange ? { id: S.exchange.id, orderNo: S.exchange.orderNo } : null,
@@ -309,6 +309,7 @@ function findOrders(q) {
   const list = [...S.sales].sort((a, b) => b.ts - a.ts);
   if (!t) return list.slice(0, 60);
   return list.filter(s => (s.orderNo || "").toLowerCase().includes(t) || (s.custName || "").toLowerCase().includes(t) || (s.ship && (s.ship.name || "").toLowerCase().includes(t))
+    || (s.hyundaiReceiptNo && s.hyundaiReceiptNo.toLowerCase().includes(t))
     || (d.length >= 4 && (digits(s.custPhone).includes(d) || (s.ship && digits(s.ship.phone).includes(d)))));
 }
 const daysSince = ts => Math.floor((new Date(dayKey(Date.now())) - new Date(dayKey(ts))) / 86400000);
@@ -342,6 +343,7 @@ function openOrder(id) {
       <div>정상가 <b class="num">${won(s.gross)}</b> · 기본할인 <b class="num">${won(s.baseDisc)}</b>${s.promoDisc ? ` · 프로모션 <b class="num">${won(s.promoDisc)}</b>` : ""}${s.excDisc ? ` · <span class="warn-txt">예외할인 ${won(s.excDisc)}</span>` : ""}</div>
       <div>판매금액 <b class="num">${won(s.total)}</b> · 실결제 <b class="num">${won(s.paid)}</b>${s.refunded ? ` · <span class="bad-txt">환불 ${won(s.refunded)}</span>` : ""}</div>
       <div>주문자 <b>${esc(s.custName || "—")}</b> ${esc(s.custPhone || "")}</div>
+      ${s.hyundaiReceiptNo ? `<div class="wide">더현대 영수증 NO: <b class="num">${esc(s.hyundaiReceiptNo)}</b></div>` : ""}
       <div>${s.ship ? `수령자 <b>${esc(s.ship.name)}</b> ${esc(s.ship.phone)}<br><span class="note">${esc(s.ship.addr)}${s.ship.memo ? ` · ${esc(s.ship.memo)}` : ""}</span>` : `<span class="note">배송 정보 없음</span>`}</div>
       ${s.memo ? `<div class="wide">메모: ${esc(s.memo)}</div>` : ""}
       ${s.orderExc ? `<div class="wide warn-txt">주문 예외할인 ${won(s.orderExc.amount)}원 · ${esc(s.orderExc.reason)}</div>` : ""}
@@ -403,6 +405,7 @@ function openCancel(id, kind) {
 }
 async function doCancel(id, kind) {
   const s = S.sales.find(x => x.id === id); if (!s) return;
+  if (!s.hyundaiReceiptNo) { toast("⚠️ 더현대 영수증 번호가 없어요. 백화점 POS 처리 시 필요할 수 있습니다. 주문 상세에서 영수증 번호를 추가한 후 진행해 주세요.", "warn"); }
   const lines = [];
   s.items.forEach((it, i) => { const ck = $(`[data-cpick="${i}"]`); if (ck && ck.checked) lines.push({ i, qty: +$(`[data-cqty="${i}"]`).value, disp: it.type === "pickup" ? $(`[data-cdisp="${i}"]`).value : (it.exp ? "ezcancel" : "ship") }); });
   if (!lines.length) { toast("취소할 상품을 골라 주세요.", "bad"); return; }
@@ -773,8 +776,9 @@ function openConfirm() {
     <label class="check" style="margin-top:8px"><input type="checkbox" id="f-consent"> <span><b>[필수] 개인정보 수집·이용 동의를 받았어요</b><br><span class="note">수집 항목: 이름, 연락처, 주소 · 목적: 상품 배송, 주문·교환·환불 안내 · 보관: 팝업 종료 후 3개월 뒤 파기 · 배송을 위해 택배사·물류사에 제공돼요. 고객에게 이 내용을 읽어 주고 동의를 받으세요.</span></span></label></div>` : ""}
     <div class="box"><h4>결제 기록 (실결제는 백화점 단말기)</h4><div class="form-grid">
       <label>실결제금액 (원)<input class="input num" id="f-paid" inputmode="numeric" value="${pr.total}"></label>
+      <label>더현대 영수증 NO (선택)<input class="input" id="f-receipt-no" placeholder="예: 9151-0121" autocomplete="off"></label>
       <label>메모<input class="input" id="f-memo" placeholder="예: 복합결제, 임직원 할인, 현금영수증 번호 이슈"></label>
-    </div><p class="note">임직원 할인·카드 할인권 등으로 실제 결제금액이 다르면 고쳐 주세요.</p></div>`,
+    </div><p class="note">임직원 할인·카드 할인권 등으로 실제 결제금액이 다르면 고쳐 주세요. 백화점 영수증의 NO 번호를 입력하면 반품 시 정확히 매칭돼요.</p></div>`,
     `<button class="btn" data-act="close">돌아가기</button><button class="btn primary" data-act="sale-commit">판매 확정</button>`);
   const ph = ["#f-phone", "#f-rphone"].map(s => $(s)).filter(Boolean);
   ph.forEach(x => x.addEventListener("input", () => { x.value = fmtPhone(x.value); }));
@@ -783,7 +787,7 @@ function openConfirm() {
 function readConfirm() {
   const v = id => ($(id) ? $(id).value.trim() : "");
   const needShip = S.cart.some(c => c.type !== "pickup");
-  const f = { name: v("#f-name"), phone: fmtPhone(v("#f-phone")), paid: parseInt(digits(v("#f-paid")), 10) || 0, memo: v("#f-memo") };
+  const f = { name: v("#f-name"), phone: fmtPhone(v("#f-phone")), paid: parseInt(digits(v("#f-paid")), 10) || 0, memo: v("#f-memo"), hyundaiReceiptNo: v("#f-receipt-no") || null };
   if ($("#f-optok") && !$("#f-optok").checked) return { err: "검색으로 담은 상품의 컬러·사이즈를 확인하고 체크해 주세요." };
   if (needShip) {
     Object.assign(f, { rname: v("#f-rname") || f.name, rphone: fmtPhone(v("#f-rphone")) || f.phone, addr: v("#f-addr"), smemo: v("#f-smemo") });
