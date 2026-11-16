@@ -426,7 +426,7 @@ async function doCancel(id, kind) {
   } catch (e) { writeFail(e); }
 }
 
-// ---------- 출고 요청 ----------
+// ---------- 입고 요청 ----------
 function reqItems() {
   return Object.entries(S.reqDraft).filter(([, q]) => q > 0).map(([bc, qty]) => ({ bc, qty }))
     .sort((a, b) => S.products.indexOf(S.byBc[a.bc]) - S.products.indexOf(S.byBc[b.bc]));
@@ -456,7 +456,7 @@ async function submitRequest() {
   try {
     await Net.put(P("requests", id), doc);
     S.reqDraft = {}; S.reqMemo = ""; render();
-    toast("출고 요청을 등록했어요.", "go");
+    toast("입고 요청을 등록했어요.", "go");
     saveFile(`${fileTag()}_출고요청_${stamp()}_전표.xlsx`, slipBook(items, "출고수량"));
   } catch (e) { writeFail(e); }
 }
@@ -664,7 +664,7 @@ function openExc(i) {
 }
 
 // ---------- 화면 ----------
-const TABS = [["sell", "판매"], ["orders", "주문 조회"], ["ship", "배송 발주"], ["stock", "재고 현황"], ["request", "출고 요청"], ["receive", "입고 반영"], ["report", "매출·마감"], ["admin", "설정", true]];
+const TABS = [["sell", "판매"], ["orders", "주문 조회"], ["ship", "배송 발주"], ["stock", "재고 현황"], ["request", "입고 요청"], ["receive", "입고 반영"], ["report", "매출·마감"], ["admin", "설정", true]];
 function render() {
   if (composing) { renderPending = true; return; }
   const tabs = TABS.filter(t => !t[2] || isHQ());
@@ -904,7 +904,7 @@ function viewRequest() {
   const reqs = [...S.requests].sort((a, b) => b.ts - a.ts);
   return `<div class="cols">
     <section class="panel">
-      <div class="panel-h"><h2>출고 요청 만들기</h2><span class="sub">본사에 보낼 상품과 수량을 고르세요</span>
+      <div class="panel-h"><h2>입고 요청 만들기</h2><span class="sub">본사에 요청할 상품과 수량을 고르세요</span>
         <div class="filters spacer">
           <input class="input" id="req-q" placeholder="검색" value="${esc(f.q)}">
           <div class="seg" role="group">${[["sold", "판매된 상품"], ["carried", "입고 상품"], ["all", "전체 상품"]].map(([k, l]) => `<button data-act="req-mode" data-m="${k}" aria-pressed="${f.mode === k}">${l}</button>`).join("")}</div>
@@ -934,7 +934,7 @@ function viewRequest() {
         <span style="display:flex;gap:4px;flex-wrap:wrap">
           <button class="btn sm" data-act="req-view" data-id="${r.id}">보기</button><button class="btn sm" data-act="req-slip" data-id="${r.id}">전표 받기</button>
           ${r.status === "요청" && isHQ() ? `<button class="btn sm" data-act="req-ack" data-id="${r.id}">출고확인</button>` : ""}
-        </span></div>`).join("") || `<div class="empty">아직 출고 요청이 없어요.</div>`}</div>
+        </span></div>`).join("") || `<div class="empty">아직 입고 요청이 없어요.</div>`}</div>
     </section></div>`;
 }
 
@@ -950,7 +950,7 @@ function viewReceive() {
       <div class="filters"><b>${esc(up.fileName)}</b><span class="chip">수량 열: ${esc(up.qName)}</span><span class="chip go">전표 ${up.qty}개 · 받은 수량 ${got}개</span>${up.bad.length ? `<span class="chip bad">매칭 안 됨 ${up.bad.length}행</span>` : ""}</div>
       ${dup ? `<div class="banner warn">같은 내용의 입고가 ${mdhm(dup.ts)}에 이미 반영됐어요. 같은 전표를 두 번 올린 건 아닌지 확인해 주세요.</div>` : ""}
       <div class="banner info">상자를 열어 실물을 세고, 전표와 다르면 ‘받은 수량’을 고쳐 주세요. 받은 수량만 재고에 더해져요.</div>
-      <label class="filters">연결할 출고 요청 <select class="input" id="up-req"><option value="">연결 안 함</option>${open.map(r => `<option value="${r.id}" ${up.requestId === r.id ? "selected" : ""}>${mdhm(r.ts)} · ${r.items.length}개 품목 ${r.qty}개 (${r.status})</option>`).join("")}</select></label>
+      <label class="filters">연결할 입고 요청 <select class="input" id="up-req"><option value="">연결 안 함</option>${open.map(r => `<option value="${r.id}" ${up.requestId === r.id ? "selected" : ""}>${mdhm(r.ts)} · ${r.items.length}개 품목 ${r.qty}개 (${r.status})</option>`).join("")}</select></label>
       <div class="scroll" style="max-height:48vh"><table><thead><tr><th>상품</th><th>옵션</th><th>이지어드민</th><th class="r">현재고</th><th class="r">전표</th><th class="c">받은 수량</th><th class="r">반영 후</th></tr></thead><tbody>
         ${up.items.map((i, k) => { const p = S.byBc[i.bc], st = L.stock(i.bc); return `<tr class="${i.got !== i.qty ? "low" : ""}"><td class="name-cell">${esc(p.name)}</td><td>${esc(optLabel(p))}</td><td class="mono">${esc(p.ez)}</td><td class="r num">${st}</td><td class="r num">${i.qty}</td><td class="c"><input class="input qty-input" data-upq="${k}" value="${i.got}" inputmode="numeric"></td><td class="r num"><b>${st + i.got}</b></td></tr>`; }).join("")}
         ${up.bad.map(b => `<tr class="unmatched"><td colspan="4">${b.row}행 · 코드 <span class="mono">${esc(b.code || "(비어 있음)")}</span> — 상품 마스터에 없는 코드라 제외돼요</td><td class="r num">${b.qty}</td><td></td><td></td></tr>`).join("")}
@@ -1123,14 +1123,14 @@ document.addEventListener("click", async e => {
   else if (a === "req-ack") setReqStatus(d.id, "출고확인");
   else if (a === "req-view") {
     const r = S.requests.find(x => x.id === d.id);
-    openModal(`출고 요청 · ${mdhm(r.ts)}`, `<p class="note">${esc(r.by || "")}${r.memo ? " · " + esc(r.memo) : ""} · 상태 ${r.status}</p><table><thead><tr><th>상품코드</th><th>상품</th><th class="r">수량</th></tr></thead><tbody>${r.items.map(i => { const p = S.byBc[i.bc] || {}; return `<tr><td class="mono">${esc(p.ez)}</td><td class="name-cell">${esc(p.name)} <span class="note">${esc(p.color)} / ${esc(p.size)}</span></td><td class="r num">${i.qty}</td></tr>`; }).join("")}</tbody></table>`, `<button class="btn" data-act="close">닫기</button>`);
+    openModal(`입고 요청 · ${mdhm(r.ts)}`, `<p class="note">${esc(r.by || "")}${r.memo ? " · " + esc(r.memo) : ""} · 상태 ${r.status}</p><table><thead><tr><th>상품코드</th><th>상품</th><th class="r">수량</th></tr></thead><tbody>${r.items.map(i => { const p = S.byBc[i.bc] || {}; return `<tr><td class="mono">${esc(p.ez)}</td><td class="name-cell">${esc(p.name)} <span class="note">${esc(p.color)} / ${esc(p.size)}</span></td><td class="r num">${i.qty}</td></tr>`; }).join("")}</tbody></table>`, `<button class="btn" data-act="close">닫기</button>`);
   }
   else if (a === "up-clear") { S.upload = null; render(); }
   else if (a === "up-confirm") {
     const up = S.upload, got = sum(up.items, i => i.got), diff = up.items.filter(i => i.got !== i.qty).length;
     openModal("재고 추가", `<div class="confirm-big">받은 수량 총 ${got}개를 재고에 추가하시겠습니까?</div>
       ${diff ? `<p class="banner warn">전표와 받은 수량이 다른 품목이 ${diff}개 있어요 (전표 ${up.qty}개 → 받음 ${got}개). 본사에 차이를 알려 주세요.</p>` : ""}
-      ${up.requestId ? `<p>연결한 출고 요청이 ‘입고완료’로 바뀌어요.</p>` : ""}${up.bad.length ? `<p class="banner warn">매칭 안 된 ${up.bad.length}행은 빼고 추가해요.</p>` : ""}`,
+      ${up.requestId ? `<p>연결한 입고 요청이 ‘입고완료’로 바뀌어요.</p>` : ""}${up.bad.length ? `<p class="banner warn">매칭 안 된 ${up.bad.length}행은 빼고 추가해요.</p>` : ""}`,
       `<button class="btn" data-act="close">아니요</button><button class="btn go" data-act="up-commit" data-autofocus>네, 추가할게요</button>`);
   }
   else if (a === "up-commit") { b.disabled = true; commitReceipt(); }
