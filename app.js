@@ -810,7 +810,7 @@ function viewOrders() {
     const dateRow = `<tr style="background:#2a2f38"><td colspan="10" style="padding:8px;font-weight:bold;color:#4a9eff">${date}</td></tr>`;
     const orderRows = orders.map(s => `<tr>
         <td class="num">${hm(s.ts)}</td><td class="mono">${esc(s.orderNo || s.id)}</td>
-        <td class="mono" style="color:#4a9eff">${s.hyundaiReceiptNo ? esc(s.hyundaiReceiptNo) : "—"}</td>
+        <td class="mono" style="color:#4a9eff">${s.hyundaiReceiptNo ? esc(s.hyundaiReceiptNo) : `<button class="btn sm orange" data-act="receipt-edit" data-id="${s.id}">영수증 NO 입력</button>`}</td>
         <td>${esc(s.custName || "—")}<div class="note">${esc(s.custPhone || "")}</div></td>
         <td class="name-cell">${esc(saleSummary(s))}${s.excWarn ? ` <span class="chip warn">⚠ 예외할인</span>` : ""}${s.memo ? ` <span class="chip">메모</span>` : ""}</td>
         <td>${typeChips(s)}</td><td class="r num">${won(s.total)}</td><td class="r num">${s.refunded ? won(s.refunded) : ""}</td><td>${stateChip(s)}</td>
@@ -935,7 +935,7 @@ function viewRequest() {
       <div class="panel-b" style="border-top:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         <input class="input" id="req-memo" style="flex:1;min-width:200px" placeholder="메모 (예: 주말 대비 다운 재킷 보충)" value="${esc(S.reqMemo)}">
         <span><b class="num">${items.length}</b>개 품목 · 총 <b class="num">${totalQ}</b>개</span>
-        <button class="btn primary" data-act="req-confirm" ${items.length ? "" : "disabled"}>출고요청 전표 만들기</button>
+        <button class="btn primary" data-act="req-confirm" ${items.length ? "" : "disabled"}>입고 요청 전표 만들기</button>
       </div>
     </section>
     <section class="panel">
@@ -1138,7 +1138,7 @@ document.addEventListener("click", async e => {
   else if (a === "rdel") { delete S.reqDraft[d.bc]; render(); }
   else if (a === "req-confirm") {
     const items = reqItems();
-    openModal("출고요청 전표 만들기", `<div class="confirm-big">${items.length}개 품목, 총 ${sum(items, i => i.qty)}개를 본사에 요청할까요?</div>
+    openModal("입고 요청 전표 만들기", `<div class="confirm-big">${items.length}개 품목, 총 ${sum(items, i => i.qty)}개를 본사에 요청할까요?</div>
       <table><thead><tr><th>상품코드</th><th>상품</th><th class="r">수량</th></tr></thead><tbody>${items.map(i => { const p = S.byBc[i.bc]; return `<tr><td class="mono">${esc(p.ez)}</td><td class="name-cell">${esc(p.name)} <span class="note">${esc(optLabel(p))}</span></td><td class="r num">${i.qty}</td></tr>`; }).join("")}</tbody></table>
       <p class="note">요청이 기록되고, 이지어드민 전표 엑셀(상품코드 / 요청수량 / 출고수량)이 저장돼요.</p>`,
       `<button class="btn" data-act="close">돌아가기</button><button class="btn primary" data-act="req-submit" data-autofocus>요청 등록 + 전표 저장</button>`);
