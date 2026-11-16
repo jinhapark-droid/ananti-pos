@@ -1056,7 +1056,7 @@ function goTab(t) { S.tab = t; closeModal(); try { history.replaceState(null, ""
 document.addEventListener("click", async e => {
   const tabA = e.target.closest("nav.tabs a[data-tab]");
   if (tabA) { e.preventDefault(); goTab(tabA.dataset.tab); return; }
-  const b = e.target.closest("[data-act]"); if (!b) { if (e.target.id === "mbg") closeModal(); return; }
+  const b = e.target.closest("[data-act]"); if (!b) return;
   const a = b.dataset.act, d = b.dataset;
   if (a === "close") closeModal();
   else if (a === "goto") goTab(d.tab);
