@@ -633,6 +633,7 @@ function openModal(title, body, foot) {
   $("#modal-root").innerHTML = `<div class="modal-bg" id="mbg"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="modal-h"><h3>${esc(title)}</h3><button class="x" data-act="close" aria-label="닫기">×</button></div>
     <div class="modal-b">${body}</div><div class="modal-f">${foot}</div></div></div>`;
+  $("#modal-root").addEventListener("click", e => { if (e.target.id === "mbg") e.stopPropagation(); });
   const first = $("#modal-root [data-autofocus]"); if (first) first.focus();
 }
 function closeModal() { $("#modal-root").innerHTML = ""; }
@@ -775,10 +776,10 @@ function openConfirm() {
     </div>
     <label class="check" style="margin-top:8px"><input type="checkbox" id="f-consent"> <span><b>[필수] 개인정보 수집·이용 동의를 받았어요</b><br><span class="note">수집 항목: 이름, 연락처, 주소 · 목적: 상품 배송, 주문·교환·환불 안내 · 보관: 팝업 종료 후 3개월 뒤 파기 · 배송을 위해 택배사·물류사에 제공돼요. 고객에게 이 내용을 읽어 주고 동의를 받으세요.</span></span></label></div>` : ""}
     <div class="box"><h4>결제 기록 (실결제는 백화점 단말기)</h4><div class="form-grid">
-      <label>실결제금액 (원)<input class="input num" id="f-paid" inputmode="numeric" value="${pr.total}"></label>
       <label>더현대 영수증 NO (선택)<input class="input" id="f-receipt-no" placeholder="예: 9151-0121" autocomplete="off"></label>
+      <label>실결제금액 (원)<input class="input num" id="f-paid" inputmode="numeric" value="${pr.total}"></label>
       <label>메모<input class="input" id="f-memo" placeholder="예: 복합결제, 임직원 할인, 현금영수증 번호 이슈"></label>
-    </div><p class="note">임직원 할인·카드 할인권 등으로 실제 결제금액이 다르면 고쳐 주세요. 백화점 영수증의 NO 번호를 입력하면 반품 시 정확히 매칭돼요.</p></div>`,
+    </div><p class="note">백화점 영수증의 NO 번호를 입력하면 반품 시 정확히 매칭돼요. 임직원 할인·카드 할인권 등으로 실제 결제금액이 다르면 고쳐 주세요.</p></div>`,
     `<button class="btn" data-act="close">돌아가기</button><button class="btn primary" data-act="sale-commit">판매 확정</button>`);
   const ph = ["#f-phone", "#f-rphone"].map(s => $(s)).filter(Boolean);
   ph.forEach(x => x.addEventListener("input", () => { x.value = fmtPhone(x.value); }));
@@ -800,17 +801,25 @@ function readConfirm() {
 
 function viewOrders() {
   const list = findOrders(S.lookupQ);
-  return `<section class="panel">
-    <div class="panel-h"><h2>주문 조회</h2><span class="sub">날짜와 상관없이 찾아요 · 연락처 뒤 4자리, 주문번호, 이름</span>
-      <div class="filters spacer"><input class="input" id="lookup-q" placeholder="예: 5678 · C261120-003 · 홍길동" value="${esc(S.lookupQ)}" style="min-width:260px"></div></div>
-    <div class="scroll" style="max-height:72vh"><table>
-      <thead><tr><th>일시</th><th>주문번호</th><th>주문자</th><th>상품</th><th>유형</th><th class="r">판매금액</th><th class="r">환불</th><th>상태</th><th></th></tr></thead>
-      <tbody>${list.map(s => `<tr>
-        <td class="num">${mdhm(s.ts)}</td><td class="mono">${esc(s.orderNo || s.id)}</td>
+  const byDate = {};
+  list.forEach(s => { const d = dayKey(s.ts); (byDate[d] = byDate[d] || []).push(s); });
+  const rows = Object.entries(byDate).reverse().flatMap(([date, orders]) => {
+    const dateRow = `<tr style="background:#2a2f38"><td colspan="10" style="padding:8px;font-weight:bold;color:#4a9eff">${date}</td></tr>`;
+    const orderRows = orders.map(s => `<tr>
+        <td class="num">${hm(s.ts)}</td><td class="mono">${esc(s.orderNo || s.id)}</td>
+        <td class="mono" style="color:#4a9eff">${s.hyundaiReceiptNo ? esc(s.hyundaiReceiptNo) : "—"}</td>
         <td>${esc(s.custName || "—")}<div class="note">${esc(s.custPhone || "")}</div></td>
         <td class="name-cell">${esc(saleSummary(s))}${s.excWarn ? ` <span class="chip warn">⚠ 예외할인</span>` : ""}${s.memo ? ` <span class="chip">메모</span>` : ""}</td>
         <td>${typeChips(s)}</td><td class="r num">${won(s.total)}</td><td class="r num">${s.refunded ? won(s.refunded) : ""}</td><td>${stateChip(s)}</td>
-        <td><button class="btn sm" data-act="order" data-id="${s.id}">열기</button></td></tr>`).join("") || `<tr><td colspan="9"><div class="empty">찾는 주문이 없어요.</div></td></tr>`}</tbody>
+        <td><button class="btn sm" data-act="order" data-id="${s.id}">열기</button></td></tr>`).join("");
+    return dateRow + orderRows;
+  });
+  return `<section class="panel">
+    <div class="panel-h"><h2>주문 조회</h2><span class="sub">날짜별로 정렬됨 · 영수증NO, 연락처 뒤 4자리, 주문번호, 이름으로 검색</span>
+      <div class="filters spacer"><input class="input" id="lookup-q" placeholder="예: 9151-0121 · 5678 · C261120-003" value="${esc(S.lookupQ)}" style="min-width:260px"></div></div>
+    <div class="scroll" style="max-height:72vh"><table>
+      <thead><tr><th style="width:50px">시간</th><th>주문번호</th><th style="color:#4a9eff">영수증NO</th><th>주문자</th><th>상품</th><th>유형</th><th class="r">판매금액</th><th class="r">환불</th><th>상태</th><th style="width:60px"></th></tr></thead>
+      <tbody>${rows.length ? rows.join("") : `<tr><td colspan="10"><div class="empty">찾는 주문이 없어요.</div></td></tr>`}</tbody>
     </table></div></section>`;
 }
 
