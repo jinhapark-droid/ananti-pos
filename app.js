@@ -361,7 +361,8 @@ function openOrder(id) {
 }
 const RULES = `<details class="box"><summary>상황별 처리 규칙 (백화점 POS · 이 POS · 이지어드민)</summary>
   <table class="rules" style="margin-top:8px"><thead><tr><th>상황</th><th>백화점 POS</th><th>이 POS</th><th>이지어드민</th></tr></thead><tbody>
-  <tr><td>교환 (사이즈·컬러)</td><td>원결제 취소 후 새 상품 재결제</td><td>[교환] → 원상품 취소 → 새 상품 판매 (두 주문이 자동 연결)</td><td>택배 건이면 기존 발주 취소 후 새 발주</td></tr>
+  <tr><td>교환 - 동일상품<br>(사이즈·컬러만 변경)</td><td>처리 없음</td><td>[교환] → 원상품 취소 → 새 상품(색상/사이즈만 다름) 판매</td><td>발주 상태에 따라 수정 또는 취소·재발주</td></tr>
+  <tr><td>교환 - 다른상품</td><td>원결제 취소 후 새 상품 재결제</td><td>[교환] → 원상품 취소 → 새 상품 판매 (두 주문이 자동 연결)</td><td>택배 건이면 기존 발주 취소 후 새 발주</td></tr>
   <tr><td>부분 환불</td><td>전액 취소 후 남는 상품만 재결제</td><td>[취소·환불]에서 해당 상품·수량만 선택</td><td>택배 건이면 해당 상품 발주 취소</td></tr>
   <tr><td>전체 환불</td><td>결제 취소</td><td>[취소·환불]에서 전체 선택</td><td>택배 건이면 발주 취소·회수</td></tr>
   <tr><td>현금영수증 번호 변경</td><td>취소 후 같은 금액 재결제</td><td>처리 없음 · 메모만 남기기</td><td>처리 없음</td></tr>
