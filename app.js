@@ -806,7 +806,7 @@ function viewOrders() {
   const list = findOrders(S.lookupQ);
   const byDate = {};
   list.forEach(s => { const d = dayKey(s.ts); (byDate[d] = byDate[d] || []).push(s); });
-  const rows = Object.entries(byDate).reverse().flatMap(([date, orders]) => {
+  const rows = Object.entries(byDate).sort((a, b) => b[0].localeCompare(a[0])).flatMap(([date, orders]) => {
     const dateRow = `<tr style="background:#2a2f38"><td colspan="10" style="padding:8px;font-weight:bold;color:#4a9eff">${date}</td></tr>`;
     const orderRows = orders.map(s => `<tr>
         <td class="num">${hm(s.ts)}</td><td class="mono">${esc(s.orderNo || s.id)}</td>
