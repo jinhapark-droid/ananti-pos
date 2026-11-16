@@ -36,6 +36,7 @@ const optLabel = p => `${p.color} / ${p.size}`;
 const sum = (arr, f) => arr.reduce((a, x) => a + (f ? f(x) : x), 0);
 const digits = s => String(s || "").replace(/\D/g, "");
 const fmtPhone = v => { const d = digits(v).slice(0, 11); if (d.length < 9) return d; if (d.startsWith("02")) return d.length === 9 ? `${d.slice(0, 2)}-${d.slice(2, 5)}-${d.slice(5)}` : `${d.slice(0, 2)}-${d.slice(2, 6)}-${d.slice(6)}`; return d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`; };
+const fmtReceiptNo = v => { const d = digits(v).slice(0, 8); if (d.length <= 4) return d; return `${d.slice(0, 4)}-${d.slice(4)}`; };
 const ls = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } };
 const isHQ = () => S.me && S.me.role === "hq";
 
@@ -334,6 +335,7 @@ function openOrder(id) {
   const canShipEdit = s.ship && s.items.some(it => it.type !== "pickup" && !it.exp && it.qty - it.cq > 0);
   const left = sum(s.items, it => it.qty - it.cq);
   openModal(`주문 ${s.orderNo || s.id}`, `
+    ${!s.hyundaiReceiptNo ? `<div class="banner warn" style="margin-bottom:8px">⚠️ 더현대 영수증 번호 미등록 · 반품 시 필요할 수 있어요</div>` : ""}
     <div class="filters" style="margin-bottom:8px">${stateChip(s)} ${typeChips(s)} <span class="note">${full(s.ts)} · 담당 ${esc(s.by || "—")}</span></div>
     <table><thead><tr><th>상품</th><th>유형</th><th class="r">수량</th><th class="r">금액</th><th>상태</th></tr></thead><tbody>
     ${s.items.map(it => `<tr><td class="name-cell"><b>${esc(it.name)}</b> <span class="opt-big" style="font-size:14px">${esc(it.color)} / <span class="c">${esc(it.size)}</span></span>${it.note ? `<div class="note">${esc(it.note)}</div>` : ""}${it.excInfo ? `<div class="note warn-txt">예외할인 ${won(it.exc)}원 · ${esc(it.excInfo.reason)}</div>` : ""}</td>
@@ -352,6 +354,7 @@ function openOrder(id) {
     </div></div>
     ${s.cancels.length ? `<div class="box"><h4>취소·환불 이력</h4>${s.cancels.map(c => `<div class="note">${full(c.ts)} · ${c.kind === "exchange" ? "교환" : "취소"} · ${c.lines.map(l => `${esc((s.items[l.i] || {}).name)} ${esc((s.items[l.i] || {}).size)} ×${l.qty}${l.disp ? ` (${DISP[l.disp] || "발주 취소"})` : ""}`).join(", ")} · 환불 ${won(c.refund)}원 · ${esc(c.reason || "")} · 처리 ${esc(c.by || "—")}</div>`).join("")}</div>` : ""}`,
     `<button class="btn" data-act="receipt" data-id="${s.id}">고객 영수증 QR</button>
+     ${!s.hyundaiReceiptNo ? `<button class="btn warn" data-act="receipt-edit" data-id="${s.id}">영수증 번호 입력</button>` : ""}
      <button class="btn" data-act="memo-edit" data-id="${s.id}">메모·실결제 수정</button>
      ${canShipEdit ? `<button class="btn" data-act="ship-edit" data-id="${s.id}">배송정보 수정</button>` : ""}
      ${left ? `<button class="btn yellow" data-act="cancel-open" data-id="${s.id}" data-k="exchange">교환</button><button class="btn primary" data-act="cancel-open" data-id="${s.id}" data-k="cancel">취소·환불</button>` : ""}`);
@@ -1098,6 +1101,19 @@ document.addEventListener("click", async e => {
     const s = S.sales.find(x => x.id === d.id);
     openModal(`메모·실결제 · ${s.orderNo}`, `<div class="form-grid"><label>실결제금액 (원)<input class="input num" id="m-paid" value="${s.paid}" inputmode="numeric"></label><label>판매금액<input class="input num" value="${s.total}" disabled></label><label class="wide">메모<input class="input" id="m-memo" value="${esc(s.memo || "")}"></label></div>`,
       `<button class="btn" data-act="close">닫기</button><button class="btn primary" data-act="memo-save" data-id="${s.id}">저장</button>`);
+  }
+  else if (a === "receipt-edit") {
+    const s = S.sales.find(x => x.id === d.id);
+    openModal(`영수증 번호 · ${s.orderNo}`, `<div class="form-grid"><label>더현대 영수증 NO<input class="input" id="r-no" placeholder="예: 9151-0121" value="${s.hyundaiReceiptNo || ""}" data-autofocus></label></div><p class="note">예: 9151-0121 (하이픈은 자동으로 입력돼요)</p>`,
+      `<button class="btn" data-act="close">닫기</button><button class="btn primary" data-act="receipt-save" data-id="${s.id}">저장</button>`);
+    const inp = $("#r-no");
+    if (inp) inp.addEventListener("input", () => { inp.value = fmtReceiptNo(inp.value); });
+  }
+  else if (a === "receipt-save") {
+    const s = S.sales.find(x => x.id === d.id);
+    const no = ($("#r-no") ? $("#r-no").value.trim() : "").slice(0, 20) || null;
+    if (no && !no.match(/^\d{4}-\d+$/)) { toast("영수증 번호 형식이 잘못됐어요. (예: 9151-0121)", "bad"); return; }
+    Net.put(P("sales", d.id), { hyundaiReceiptNo: no }, true).then(() => { closeModal(); render(); toast("영수증 번호를 저장했어요.", "go"); }).catch(writeFail);
   }
   else if (a === "memo-save") { try { await Net.put(P("sales", d.id), { paid: parseInt(digits($("#m-paid").value), 10) || 0, memo: $("#m-memo").value.trim() }, true); closeModal(); toast("저장했어요.", "go"); } catch (err) { writeFail(err); } }
   else if (a === "ship-edit") {
