@@ -418,6 +418,32 @@ function openCancel(id, kind) {
   $("#modal-root").addEventListener("change", e => { if (e.target.dataset.cpick !== undefined || e.target.dataset.cqty !== undefined) recalc(); });
   $("#c-reason").addEventListener("change", e => { if (e.target.value === "불량") document.querySelectorAll("[data-cdisp]").forEach(x => x.value = "defect"); });
 }
+function openStockAdjust(bc) {
+  const p = S.byBc[bc]; if (!p) return;
+  const L = ledger(), st = L.stock(bc);
+  openModal(`재고 조정 · ${esc(p.name)} ${esc(p.color)} / ${esc(p.size)}`, `
+    <p class="note">현재 재고: <b>${st}개</b></p>
+    <div class="form-grid">
+      <label>처리 방법<select class="input" id="adj-disp">${Object.entries(DISP).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></label>
+      <label>조정 수량<input class="input num" id="adj-qty" inputmode="numeric" placeholder="0" value="0"></label>
+      <label class="wide">메모<input class="input" id="adj-memo" placeholder="예: 실사 결과 부족 2개, 불량 발견 등"></label>
+    </div>
+    <div class="banner warn" style="font-weight:600">⚠️ 중요: 본사에 반드시 알림하세요!<br>이 조정 내용이 본사로 전송되며 기록으로 남겨집니다.</div>
+  `, `<button class="btn" data-act="close">취소</button><button class="btn primary" data-act="stock-adj-do" data-bc="${bc}">조정 저장</button>`);
+}
+async function doStockAdjust(bc) {
+  const disp = $("#adj-disp")?.value; const qty = Math.max(0, parseInt(digits($("#adj-qty").value), 10) || 0); const memo = $("#adj-memo")?.value?.trim() || "";
+  if (!qty) { toast("조정 수량을 입력해 주세요.", "bad"); return; }
+  const p = S.byBc[bc]; if (!p) return;
+  closeModal();
+  try {
+    const entry = { bc, qty, disp, memo, ts: Date.now(), by: S.me.name };
+    S.movements = S.movements || []; S.movements.push(entry);
+    await Net.put(P("stock_adj", rid("ADJ")), entry);
+    toast(`${DISP[disp]} · ${qty}개 조정됨`, "go");
+    render();
+  } catch (e) { writeFail(e); }
+}
 async function doCancel(id, kind) {
   const s = S.sales.find(x => x.id === id); if (!s) return;
   if (!s.hyundaiReceiptNo) { toast("⚠️ 더현대 영수증 번호가 없어요. 백화점 POS 처리 시 필요할 수 있습니다. 주문 상세에서 영수증 번호를 추가한 후 진행해 주세요.", "warn"); }
@@ -627,6 +653,7 @@ function movements() {
     out.push({ ts: s.ts, type: "판매", p, qty: -it.qty, ref: s.orderNo || s.id, by: s.by });
     for (const c of s.cancels) for (const l of c.lines) if (s.items[l.i] === it && l.disp === "restock") out.push({ ts: c.ts, type: "취소 복구", p, qty: l.qty, ref: s.orderNo || s.id, by: c.by });
   }
+  for (const m of S.movements || []) { const p = S.byBc[m.bc]; if (p) out.push({ ts: m.ts, type: DISP[m.disp] || m.disp, p, qty: -m.qty, ref: m.memo || "재고조정", by: m.by }); }
   return out.sort((a, b) => b.ts - a.ts);
 }
 function exportReport(day) {
@@ -893,10 +920,10 @@ function viewStock() {
     if (f.mode === "low" && st > S.lowLine) return false;
     return q.every(w => `${p.name} ${p.color} ${p.size} ${p.ez} ${p.bc} ${p.code}`.toLowerCase().includes(w));
   };
-  const rows = stockRows(fil, { span: 10, row: (p, L) => { const st = L.stock(p.bc); return `<tr class="${st <= 0 ? "out" : st <= S.lowLine ? "low" : ""}">
+  const rows = stockRows(fil, { span: 11, row: (p, L) => { const st = L.stock(p.bc); return `<tr class="${st <= 0 ? "out" : st <= S.lowLine ? "low" : ""}">
     <td>${esc(p.color)}</td><td>${esc(p.size)}</td><td class="mono">${esc(p.ez)}</td><td class="mono">${esc(p.bc)}</td>
     <td class="r num">${L.init[p.bc] || 0}</td><td class="r num">${L.inQ[p.bc] || 0}</td><td class="r num">${L.net(p.bc)}</td><td class="r num">${L.hold[p.bc] || ""}</td>
-    <td class="r num"><b>${st}</b></td><td class="c">${st <= 0 ? `<span class="chip bad">품절</span>` : st <= S.lowLine ? `<span class="chip warn">부족</span>` : `<span class="chip go">정상</span>`}</td></tr>`; } });
+    <td class="r num"><b>${st}</b></td><td class="c">${st <= 0 ? `<span class="chip bad">품절</span>` : st <= S.lowLine ? `<span class="chip warn">부족</span>` : `<span class="chip go">정상</span>`}</td><td class="c"><button class="btn sm" data-act="stock-adjust" data-bc="${p.bc}">조정</button></td></tr>`; } });
   return `<div class="kpis">
       <div class="kpi"><div class="l">현재 매장 재고</div><div class="n">${totalNow}</div><div class="s">${carried.length}개 SKU</div></div>
       <div class="kpi"><div class="l">초기 입고</div><div class="n">${sum(Object.values(L.init))}</div></div>
@@ -912,7 +939,7 @@ function viewStock() {
           <label class="note">부족 기준 <select class="input" id="low-line">${[0, 1, 2, 3].map(n => `<option value="${n}" ${n === S.lowLine ? "selected" : ""}>${n ? n + "개 이하" : "품절만"}</option>`).join("")}</select></label>
         </div></div>
       <div class="scroll" style="max-height:70vh"><table>
-        <thead><tr><th>컬러</th><th>사이즈</th><th>이지어드민</th><th>바코드</th><th class="r">초기</th><th class="r">입고</th><th class="r">현장판매</th><th class="r">불량분리</th><th class="r">현재고</th><th class="c">상태</th></tr></thead>
+        <thead><tr><th>컬러</th><th>사이즈</th><th>이지어드민</th><th>바코드</th><th class="r">초기</th><th class="r">입고</th><th class="r">현장판매</th><th class="r">불량분리</th><th class="r">현재고</th><th class="c">상태</th><th class="c">관리</th></tr></thead>
         <tbody>${rows || `<tr><td colspan="10"><div class="empty">조건에 맞는 상품이 없어요.</div></td></tr>`}</tbody></table></div>
     </section>`;
 }
@@ -1114,6 +1141,8 @@ document.addEventListener("click", async e => {
   else if (a === "receipt") { const s = S.sales.find(x => x.id === d.id); if (s) showReceipt(s); }
   else if (a === "cancel-open") openCancel(d.id, d.k);
   else if (a === "cancel-do") doCancel(d.id, d.k);
+  else if (a === "stock-adjust") openStockAdjust(d.bc);
+  else if (a === "stock-adj-do") doStockAdjust(d.bc);
   else if (a === "memo-edit") {
     const s = S.sales.find(x => x.id === d.id);
     openModal(`메모·실결제 · ${s.orderNo}`, `<div class="form-grid"><label>실결제금액 (원)<input class="input num" id="m-paid" value="${s.paid}" inputmode="numeric"></label><label>판매금액<input class="input num" value="${s.total}" disabled></label><label class="wide">메모<input class="input" id="m-memo" value="${esc(s.memo || "")}"></label></div>`,
