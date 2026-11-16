@@ -370,6 +370,7 @@ const RULES = `<details class="box"><summary>상황별 처리 규칙 (백화점 
 function openCancel(id, kind) {
   const s = S.sales.find(x => x.id === id); if (!s) return;
   const days = daysSince(s.ts), late = days > REFUND_DAYS;
+  const promo = storeCfg().promo || {};
   const rows = s.items.map((it, i) => {
     const left = it.qty - it.cq; if (left <= 0) return "";
     const disp = it.type === "pickup"
@@ -389,20 +390,30 @@ function openCancel(id, kind) {
       <label>환불 금액 (원)<input class="input num" id="c-refund" inputmode="numeric" value="0"></label>
       <label class="wide">상세 메모<input class="input" id="c-memo" placeholder="예: 블랙 L → 블랙 XL, 현금영수증 재발행"></label>
     </div>
+    <div class="box" id="c-promo-box" style="display:none"><h4>프로모션 할인</h4><label class="check"><input type="checkbox" id="c-revoke-promo" checked> <span id="c-promo-msg"></span></label></div>
     <div class="box"><h4>확인 (모두 체크해야 진행돼요)</h4>
       <label class="check"><input type="checkbox" data-cchk> 택이 붙어 있고 착용하지 않았어요</label>
       <label class="check"><input type="checkbox" data-cchk> 영수증(주문번호)으로 구매 내역을 확인했어요</label>
       <label class="check"><input type="checkbox" data-cchk> 백화점 POS에서 ${kind === "exchange" ? "결제 취소·재결제" : "결제 취소"}를 완료했어요</label>
       ${late ? `<label class="check"><input type="checkbox" data-cchk> 기간이 지났지만 본사 승인을 받았어요</label>` : ""}
     </div>
-    <p class="note">환불 금액은 고른 상품의 판매금액으로 자동 계산돼요. 부분 취소로 프로모션 기준금액 아래로 내려가면 백화점 POS에서 실제 환불한 금액으로 고쳐 주세요.</p>
+    <p class="note">환불 금액은 고른 상품의 판매금액으로 자동 계산돼요.</p>
     ${RULES}`,
     `<button class="btn" data-act="close">돌아가기</button><button class="btn primary" data-act="cancel-do" data-id="${s.id}" data-k="${kind}">${kind === "exchange" ? "원상품 취소하고 새 상품 담기" : "취소·환불 기록"}</button>`);
   const recalc = () => {
     let r = 0;
     s.items.forEach((it, i) => { const ck = $(`[data-cpick="${i}"]`); if (ck && ck.checked) r += Math.round(it.net / it.qty * +$(`[data-cqty="${i}"]`).value); });
     $("#c-refund").value = r;
+    const residual = s.total - r;
+    const needRevoke = s.promoDisc > 0 && residual < (promo.threshold || 0);
+    if (needRevoke) {
+      $("#c-promo-box").style.display = "block";
+      $("#c-promo-msg").textContent = `프로모션 할인 ${won(s.promoDisc)}원 회수 (잔여 ${won(residual)}원 < 기준 ${won(promo.threshold)}원)`;
+    } else {
+      $("#c-promo-box").style.display = "none";
+    }
   };
+  recalc();
   $("#modal-root").addEventListener("change", e => { if (e.target.dataset.cpick !== undefined || e.target.dataset.cqty !== undefined) recalc(); });
   $("#c-reason").addEventListener("change", e => { if (e.target.value === "불량") document.querySelectorAll("[data-cdisp]").forEach(x => x.value = "defect"); });
 }
@@ -419,7 +430,12 @@ async function doCancel(id, kind) {
     if (it.type === "pickup") { if (l.disp === "restock") it.rs += l.qty; else if (l.disp === "defect") it.df += l.qty; else it.rt += l.qty; }
     else if (l.disp === "ezcancel") it.ezc = (it.ezc || 0) + l.qty;
   }
-  const entry = { id: rid("C"), ts: Date.now(), by: S.me.name, kind, lines, refund: Math.max(0, parseInt(digits($("#c-refund").value), 10) || 0), reason: $("#c-reason").value + ($("#c-memo").value.trim() ? " · " + $("#c-memo").value.trim() : ""), deptDone: true };
+  let refundAmt = Math.max(0, parseInt(digits($("#c-refund").value), 10) || 0);
+  const revokePromo = $("#c-revoke-promo")?.checked;
+  if (revokePromo && s.promoDisc > 0) {
+    refundAmt = Math.max(0, refundAmt - s.promoDisc);
+  }
+  const entry = { id: rid("C"), ts: Date.now(), by: S.me.name, kind, lines, refund: refundAmt, reason: $("#c-reason").value + ($("#c-memo").value.trim() ? " · " + $("#c-memo").value.trim() : "") + (revokePromo && s.promoDisc > 0 ? ` [프로모션 ${won(s.promoDisc)}원 회수]` : ""), deptDone: true };
   const all = items.every(it => it.cq >= it.qty);
   closeModal();
   try {
