@@ -7,7 +7,7 @@ const SB_URL = "https://owykoqnhwmdhpadxipes.supabase.co";
 const SB_KEY = "sb_publishable_Pgf79543Sk1FvB_PtWK5PA_2U9jlGbD"; // 공개용 키. 데이터는 PIN을 확인하는 DB 함수로만 접근된다.
 const POLL_MS = 6000;
 const TYPES = { pickup: "현장수령", ship: "택배배송", pre: "사전구매" };
-const DISP = { restock: "정상 재고 복구", defect: "불량 분리", return: "본사 반송" };
+const DISP = { restock: "정상 재고 복구", defect: "불량 분리", return: "본사 반송", adjust: "실사 보정", lost: "분실 처리" };
 const REASONS = ["단순 변심", "사이즈·컬러 교환", "불량", "오발송·오등록", "기타"];
 const REFUND_DAYS = 7;
 const EXC_WARN_RATE = 0.10, EXC_WARN_AMT = 50000;
@@ -229,7 +229,13 @@ function addToCart(p, via = "scan") {
     toast(`현장 재고가 없어 택배배송으로 담았어요: ${p.name} ${optLabel(p)}`, "bad");
   } else beep(true);
   const row = S.cart.find(c => c.bc === p.bc && c.type === type && !c.exc);
-  if (row) { row.qty++; if (via === "search") row.via = "search"; }
+  if (row) {
+    if (type === "pickup" && L.stock(p.bc) - cartPickup(p.bc) < row.qty + 1) {
+      toast(`⚠️ 현장 재고 부족: ${p.name}. 택배배송으로 전환하거나 수량을 줄여주세요.`, "bad");
+      beep(false); return;
+    }
+    row.qty++; if (via === "search") row.via = "search";
+  }
   else S.cart.unshift({ bc: p.bc, qty: 1, type, via, exc: null });
   render();
 }
