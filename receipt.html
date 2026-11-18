@@ -62,21 +62,21 @@ const mask = n => !n ? "" : n.length <= 2 ? n[0] + "*" : n[0] + "*".repeat(n.len
       ${refunded ? `<div class="row cx"><span>일부 상품이 취소·환불됐어요</span><span></span></div>` : ""}
       ${s.exchangeOf ? `<div class="store">교환 주문 (원주문 ${esc(s.exchangeOf.orderNo)})</div>` : ""}
       <div class="notice">${esc(cfg.notice || DEFAULT_NOTICE)}</div>
-      ${cfg.guaranteeUrl ? `<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">
         <div style="font-weight:600;font-size:14px;margin-bottom:8px">■ 온라인 보증서</div>
         <div style="color:var(--dim);font-size:13px;margin-bottom:8px">원활한 A/S 접수를 위해 아래 링크에서 온라인 보증서를 발급해 주세요.</div>
-        <div>▶ <a href="${esc(cfg.guaranteeUrl)}" target="_blank" style="color:var(--accent);text-decoration:underline">보증서 발급</a></div>
-      </div>` : ""}
-      ${cfg.chatUrl || cfg.phoneNo ? `<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">
+        <div>▶ <a href="https://app.vircle.co.kr/guarantee/issue/1276?templateIdx=700" target="_blank" style="color:var(--accent);text-decoration:underline">보증서 발급</a></div>
+      </div>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">
         <div style="font-weight:600;font-size:14px;margin-bottom:8px">■ 고객 문의</div>
         <div style="color:var(--dim);font-size:13px">
-          ${cfg.chatUrl ? `<div style="margin-bottom:8px">· 채팅 상담: <a href="${esc(cfg.chatUrl)}" target="_blank" style="color:var(--accent);text-decoration:underline">${esc(cfg.chatUrl)}</a></div>
-          <div style="margin-bottom:8px;color:var(--dim);font-size:12px">평일 10:00~17:30 (점심 12:30~13:30)</div>` : ""}
-          ${cfg.phoneNo ? `<div style="margin-bottom:8px">· 전화: <a href="tel:${esc(cfg.phoneNo)}" style="color:var(--accent);text-decoration:underline">${esc(cfg.phoneNo)}</a></div>
-          <div style="margin-bottom:8px;color:var(--dim);font-size:12px">평일 11:30~17:30 (점심 12:30~13:30)</div>` : ""}
+          <div style="margin-bottom:8px">· 채팅 상담: <a href="https://bit.ly/urbanside_cx" target="_blank" style="color:var(--accent);text-decoration:underline">bit.ly/urbanside_cx</a></div>
+          <div style="margin-bottom:8px;color:var(--dim);font-size:12px">평일 10:00~17:30 (점심 12:30~13:30)</div>
+          <div style="margin-bottom:8px">· 전화: <a href="tel:070-7666-9034" style="color:var(--accent);text-decoration:underline">070-7666-9034</a></div>
+          <div style="margin-bottom:8px;color:var(--dim);font-size:12px">평일 11:30~17:30 (점심 12:30~13:30)</div>
           <div style="color:var(--dim);font-size:12px">· 주말·공휴일에는 고객센터를 운영하지 않습니다.</div>
         </div>
-      </div>` : ""}`
+      </div>`
       <div class="store" style="margin-top:12px;font-size:12px">결제는 매장 단말기 영수증 기준이며, 이 영수증은 구매 내역 확인용이에요.</div>`;
   } catch (e) { box.innerHTML = `<div class="empty">인터넷 연결을 확인하고 다시 열어 주세요.</div>`; }
 })();
