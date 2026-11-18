@@ -311,9 +311,9 @@ async function showReceipt(s) {
   const links = [];
   const guaranteeUrl = cfg.guaranteeUrl || "https://app.vircle.co.kr/guarantee/issue/1276?templateIdx=700/";
   const phone = cfg.phone || "070-7666-9034";
-  if (guaranteeUrl) links.push(`<a href="${guaranteeUrl}" target="_blank" style="color:#1976d2;text-decoration:underline;font-weight:600">보증서 발급</a>`);
-  if (cfg.chatUrl) links.push(`<a href="${cfg.chatUrl}" target="_blank" style="color:#1976d2;text-decoration:underline;font-weight:600">채팅 상담</a>`);
-  if (phone) links.push(`<a href="tel:${phone.replace(/\D/g, '')}" style="color:#1976d2;text-decoration:underline;font-weight:600">${esc(phone)}</a>`);
+  if (guaranteeUrl) links.push(`<a href="${guaranteeUrl}" target="_blank" style="color:#1976d2;text-decoration:underline;font-weight:600;cursor:pointer">보증서 발급</a>`);
+  if (cfg.chatUrl) links.push(`<a href="${cfg.chatUrl}" target="_blank" style="color:#1976d2;text-decoration:underline;font-weight:600;cursor:pointer">채팅 상담</a>`);
+  if (phone) links.push(`<a href="tel:${phone.replace(/\D/g, '')}" style="color:#1976d2;text-decoration:underline;font-weight:600;cursor:pointer">${esc(phone)}</a>`);
   const linksHtml = links.length ? `<div style="margin-top:12px;padding:12px;background:#e3f2fd;border-radius:4px;text-align:center;border:1px solid #1976d2">${links.join(" · ")}</div>` : "";
   openModal(`고객 영수증 · ${displayOrderNo(s.orderNo)}`, `<div class="qr">
       <div class="confirm-big">주문번호 <span class="num">${esc(displayOrderNo(s.orderNo))}</span> · ${won(s.total)}원</div>
@@ -727,7 +727,7 @@ function openModal(title, body, foot) {
   $("#modal-root").innerHTML = `<div class="modal-bg" id="mbg"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="modal-h"><h3>${esc(title)}</h3><button class="x" data-act="close" aria-label="닫기">×</button></div>
     <div class="modal-b">${body}</div><div class="modal-f">${foot}</div></div></div>`;
-  $("#modal-root").addEventListener("click", e => { if (e.target.id === "mbg") e.stopPropagation(); });
+  $("#modal-root").addEventListener("click", e => { if (e.target.id === "mbg") closeModal(); });
   const first = $("#modal-root [data-autofocus]"); if (first) first.focus();
 }
 function closeModal() { $("#modal-root").innerHTML = ""; }
