@@ -195,7 +195,7 @@ function allocate(lines, weights, amount, key) {
 }
 function priceCart(cart, orderExc) {
   const promo = storeCfg().promo || {};
-  const lines = cart.map(c => { const p = S.byBc[c.bc], unit = unitOf(p.price, p.disc); return { c, p, unit, base: unit * c.qty, list: p.price * c.qty, promo: 0, exc: 0 }; });
+  const lines = cart.map(c => { const p = S.byBc[c.bc], unit = unitOf(p.price, p.disc); return { c, p, unit, base: unit * c.qty, list: p.price * c.qty, promo: 0, exc: 0, emp: 0 }; });
   const gross = sum(lines, l => l.list), sale = sum(lines, l => l.base);
   const inBasis = lines.filter(l => promo.includeExcluded !== false || l.p.disc > 0);
   const basisAmt = sum(inBasis, l => promo.basis === "list" ? l.list : l.base);
