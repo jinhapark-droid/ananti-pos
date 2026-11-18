@@ -304,9 +304,9 @@ async function showReceipt(s) {
   const links = [];
   const guaranteeUrl = cfg.guaranteeUrl || "https://app.vircle.co.kr/guarantee/issue/1276?templateIdx=700/";
   const phone = cfg.phone || "070-7666-9034";
-  if (guaranteeUrl) links.push(`<span onclick="window.open('${guaranteeUrl}', '_blank')" style="color:#1976d2;text-decoration:underline;cursor:pointer;font-weight:600">보증서 발급</span>`);
-  if (cfg.chatUrl) links.push(`<span onclick="window.open('${cfg.chatUrl}', '_blank')" style="color:#1976d2;text-decoration:underline;cursor:pointer;font-weight:600">채팅 상담</span>`);
-  if (phone) links.push(`<span onclick="window.location.href='tel:${phone.replace(/\D/g, '')}'" style="color:#1976d2;text-decoration:underline;cursor:pointer;font-weight:600">${esc(phone)}</span>`);
+  if (guaranteeUrl) links.push(`<a href="${guaranteeUrl}" target="_blank" style="color:#1976d2;text-decoration:underline;font-weight:600">보증서 발급</a>`);
+  if (cfg.chatUrl) links.push(`<a href="${cfg.chatUrl}" target="_blank" style="color:#1976d2;text-decoration:underline;font-weight:600">채팅 상담</a>`);
+  if (phone) links.push(`<a href="tel:${phone.replace(/\D/g, '')}" style="color:#1976d2;text-decoration:underline;font-weight:600">${esc(phone)}</a>`);
   const linksHtml = links.length ? `<div style="margin-top:12px;padding:12px;background:#e3f2fd;border-radius:4px;text-align:center;border:1px solid #1976d2">${links.join(" · ")}</div>` : "";
   openModal(`고객 영수증 · ${displayOrderNo(s.orderNo)}`, `<div class="qr">
       <div class="confirm-big">주문번호 <span class="num">${esc(displayOrderNo(s.orderNo))}</span> · ${won(s.total)}원</div>
