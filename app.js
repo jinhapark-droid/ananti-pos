@@ -727,7 +727,6 @@ function openModal(title, body, foot) {
   $("#modal-root").innerHTML = `<div class="modal-bg" id="mbg"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="modal-h"><h3>${esc(title)}</h3><button class="x" data-act="close" aria-label="닫기">×</button></div>
     <div class="modal-b">${body}</div><div class="modal-f">${foot}</div></div></div>`;
-  document.getElementById("mbg")?.addEventListener("click", e => { if (e.target.id === "mbg") closeModal(); });
   const first = $("#modal-root [data-autofocus]"); if (first) first.focus();
 }
 function closeModal() { $("#modal-root").innerHTML = ""; }
