@@ -169,9 +169,9 @@ function findProduct(raw) {
   return S.byCode[s.toUpperCase()] || null;
 }
 
-// ---------- 재고: 입고 합계 − 현장수령 판매 + 정상 복구된 반품 ----------
+// ---------- 재고: 입고 합계 − 현장수령 판매 + 정상 복구된 반품 + 조정 항목 ----------
 function ledger() {
-  const init = {}, inQ = {}, sold = {}, back = {}, hold = {};
+  const init = {}, inQ = {}, sold = {}, back = {}, hold = {}, adj = {};
   for (const r of S.receipts) { const t = r.kind === "init" ? init : inQ; for (const it of r.items || []) t[it.bc] = (t[it.bc] || 0) + it.qty; }
   for (const s of S.sales) for (const it of s.items) {
     if (it.type !== "pickup") continue;
@@ -179,7 +179,10 @@ function ledger() {
     back[it.bc] = (back[it.bc] || 0) + (it.rs || 0);
     hold[it.bc] = (hold[it.bc] || 0) + (it.df || 0);
   }
-  return { init, inQ, sold, back, hold, net: bc => (sold[bc] || 0) - (back[bc] || 0), stock: bc => (init[bc] || 0) + (inQ[bc] || 0) - (sold[bc] || 0) + (back[bc] || 0) };
+  for (const m of S.movements || []) {
+    adj[m.bc] = (adj[m.bc] || 0) + (m.sign * m.qty);
+  }
+  return { init, inQ, sold, back, hold, adj, net: bc => (sold[bc] || 0) - (back[bc] || 0), stock: bc => (init[bc] || 0) + (inQ[bc] || 0) - (sold[bc] || 0) + (back[bc] || 0) + (adj[bc] || 0) };
 }
 const cartPickup = bc => sum(S.cart.filter(c => c.bc === bc && c.type === "pickup"), c => c.qty);
 
@@ -224,17 +227,13 @@ const promoLabel = pr => { const p = pr || {}; return p.on ? `${won(p.threshold)
 // ---------- 판매 ----------
 function addToCart(p, via = "scan") {
   const L = ledger();
-  let type = "pickup";
-  if (L.stock(p.bc) - cartPickup(p.bc) < 1) {
-    type = "ship"; beep(false);
-    toast(`현장 재고가 없어 택배배송으로 담았어요: ${p.name} ${optLabel(p)}`, "bad");
-  } else beep(true);
+  let type = "pickup"; beep(true);
+  const stock = L.stock(p.bc) - cartPickup(p.bc);
+  if (stock < 1) {
+    toast(`⚠️ 현장 재고 부족: ${p.name} (현재 ${L.stock(p.bc)}개). 음수 주문이 가능합니다 (판매 확정 시 사유 입력 필수).`, "warn");
+  }
   const row = S.cart.find(c => c.bc === p.bc && c.type === type && !c.exc);
   if (row) {
-    if (type === "pickup" && L.stock(p.bc) - cartPickup(p.bc) < row.qty + 1) {
-      toast(`⚠️ 현장 재고 부족: ${p.name}. 택배배송으로 전환하거나 수량을 줄여주세요.`, "bad");
-      beep(false); return;
-    }
     row.qty++; if (via === "search") row.via = "search";
   }
   else S.cart.unshift({ bc: p.bc, qty: 1, type, via, exc: null });
@@ -246,7 +245,7 @@ function handleScan(raw) {
   addToCart(p, "scan");
 }
 function nextOrderNo(t = Date.now()) {
-  const pre = storeCfg().code + dayKey(t).slice(2).replace(/-/g, "") + "-";
+  const pre = "HD_CC" + dayKey(t).slice(2).replace(/-/g, "") + "-";
   let max = 0; for (const s of S.sales) if (s.orderNo && s.orderNo.startsWith(pre)) max = Math.max(max, +s.orderNo.slice(pre.length) || 0);
   return pre + String(max + 1).padStart(3, "0");
 }
@@ -295,11 +294,19 @@ const receiptUrl = rt => new URL("receipt.html?t=" + rt, location.href).href;
 async function showReceipt(s) {
   if (!s.rt) { s.rt = token(20); try { await Net.put(P("sales", s.id), { rt: s.rt }, true); } catch (e) { writeFail(e); return; } }
   const url = receiptUrl(s.rt);
+  const cfg = S.config || {};
+  const links = [];
+  if (cfg.guaranteeUrl) links.push(`<a href="${esc(cfg.guaranteeUrl)}" target="_blank" style="color:#1976d2;text-decoration:underline">보증서 발급하기</a>`);
+  if (cfg.chatUrl) links.push(`<a href="${esc(cfg.chatUrl)}" target="_blank" style="color:#1976d2;text-decoration:underline">채팅 상담하기</a>`);
+  if (cfg.phone) links.push(`<a href="tel:${esc(cfg.phone.replace(/\D/g, ''))}" style="color:#1976d2;text-decoration:underline">${esc(cfg.phone)}</a>`);
+  const linksHtml = links.length ? `<div style="margin-top:12px;padding:12px;background:#f5f5f5;border-radius:4px;text-align:center">${links.join(" · ")}</div>` : "";
   openModal(`고객 영수증 · ${s.orderNo}`, `<div class="qr">
       <div class="confirm-big">주문번호 <span class="num">${esc(s.orderNo)}</span> · ${won(s.total)}원</div>
       <div id="qrbox"></div>
       <div class="note">고객 휴대폰 카메라로 QR을 찍으면 영수증이 열려요. 교환·환불 때 이 화면을 보여 달라고 안내해 주세요.</div>
-      <div class="note mono" style="word-break:break-all">${esc(url)}</div></div>`,
+      ${(S.config.notice || DEFAULT_NOTICE).split("\n").map(line => `<div class="note">${esc(line)}</div>`).join("")}
+      ${linksHtml}
+      <div class="note mono" style="word-break:break-all;margin-top:12px">${esc(url)}</div></div>`,
     `<button class="btn" data-act="copy" data-v="${esc(url)}">링크 복사</button><button class="btn primary" data-act="close" data-autofocus>닫기 (Enter)</button>`);
   try { new QRCode($("#qrbox"), { text: url, width: 200, height: 200 }); } catch (e) { $("#qrbox").textContent = "QR을 만들지 못했어요. 링크를 복사해 보내 주세요."; }
 }
@@ -383,7 +390,7 @@ function openCancel(id, kind) {
       <td class="r num">${won(it.net / it.qty)}</td><td>${disp}</td></tr>`;
   }).join("");
   openModal(`${kind === "exchange" ? "교환" : "취소·환불"} · ${s.orderNo}`, `
-    ${late ? `<div class="banner bad">구매 후 ${days}일 지났어요 (기준 ${REFUND_DAYS}일). 본사 승인 없이는 진행하지 마세요.</div>` : `<div class="banner info">구매 ${days}일째 · 환불 가능 기간 안이에요.</div>`}
+    ${late ? `<div class="banner bad">구매 후 ${days}일 지났어요 (기준 ${REFUND_DAYS}일). 본사 승인 사유를 반드시 기입하고 진행하세요.</div>` : `<div class="banner info">구매 ${days}일째 · 환불 가능 기간 안이에요.</div>`}
     ${kind === "exchange" ? `<p class="note">교환 = 원상품 취소 후 새 상품 판매예요. 여기서 돌려받는 상품을 고르면, 판매 화면에서 새 상품을 담아 확정할 때 두 주문이 연결돼요.</p>` : ""}
     <table style="margin-top:10px"><thead><tr><th></th><th>상품</th><th class="c">수량</th><th class="r">개당 금액</th><th>처리</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="form-grid" style="margin-top:12px">
@@ -421,26 +428,51 @@ function openCancel(id, kind) {
 function openStockAdjust(bc) {
   const p = S.byBc[bc]; if (!p) return;
   const L = ledger(), st = L.stock(bc);
+  let sign = -1; // -1: 감소, +1: 증가
+  const updatePreview = () => {
+    const qty = Math.max(0, parseInt(digits($("#adj-qty").value), 10) || 0);
+    const after = st + (sign * qty);
+    $("#adj-preview").textContent = `${st}개 → ${after}개`;
+    $("#adj-preview").style.color = after < 0 ? "var(--bad)" : after === st ? "" : "var(--accent)";
+  };
   openModal(`재고 조정 · ${esc(p.name)} ${esc(p.color)} / ${esc(p.size)}`, `
-    <p class="note">현재 재고: <b>${st}개</b></p>
+    <div class="card highlight" style="margin-bottom:1rem">
+      <strong>현재 재고</strong><br>
+      <div style="font-size:24px;font-weight:700;color:var(--accent);margin:0.5rem 0">${st}개</div>
+      <strong>조정 후</strong><br>
+      <div id="adj-preview" style="font-size:20px;font-weight:600;margin-top:0.5rem">${st}개</div>
+    </div>
     <div class="form-grid">
       <label>처리 방법<select class="input" id="adj-disp">${Object.entries(DISP).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></label>
+      <label>조정 방향
+        <div class="seg" style="margin-top:0.5rem">
+          <button class="btn sm" id="adj-minus" style="background:var(--accent);color:white;flex:1" data-sign="-1">감소 (-)</button>
+          <button class="btn sm" id="adj-plus" style="flex:1" data-sign="+1">증가 (+)</button>
+        </div>
+      </label>
       <label>조정 수량<input class="input num" id="adj-qty" inputmode="numeric" placeholder="0" value="0"></label>
-      <label class="wide">메모<input class="input" id="adj-memo" placeholder="예: 실사 결과 부족 2개, 불량 발견 등"></label>
+      <label class="wide">메모<input class="input" id="adj-memo" placeholder="예: 실사 결과 부족 2개 / 오발송 반입 3개 등"></label>
     </div>
     <div class="banner warn" style="font-weight:600">⚠️ 중요: 본사에 반드시 알림하세요!<br>이 조정 내용이 본사로 전송되며 기록으로 남겨집니다.</div>
-  `, `<button class="btn" data-act="close">취소</button><button class="btn primary" data-act="stock-adj-do" data-bc="${bc}">조정 저장</button>`);
+  `, `<button class="btn" data-act="close">취소</button><button class="btn primary" data-act="stock-adj-do" data-bc="${bc}" data-sign="${sign}">조정 저장</button>`);
+
+  const updateSign = (s) => { sign = parseInt(s); $("#adj-minus").style.background = sign === -1 ? "var(--accent)" : ""; $("#adj-plus").style.background = sign === 1 ? "var(--accent)" : ""; $("[data-act='stock-adj-do']").dataset.sign = sign; updatePreview(); };
+  $("#adj-minus").addEventListener("click", () => updateSign("-1"));
+  $("#adj-plus").addEventListener("click", () => updateSign("1"));
+  $("#adj-qty").addEventListener("input", updatePreview);
 }
 async function doStockAdjust(bc) {
   const disp = $("#adj-disp")?.value; const qty = Math.max(0, parseInt(digits($("#adj-qty").value), 10) || 0); const memo = $("#adj-memo")?.value?.trim() || "";
   if (!qty) { toast("조정 수량을 입력해 주세요.", "bad"); return; }
   const p = S.byBc[bc]; if (!p) return;
+  const sign = parseInt($("[data-act='stock-adj-do']")?.dataset.sign) || -1;
   closeModal();
   try {
-    const entry = { bc, qty, disp, memo, ts: Date.now(), by: S.me.name };
+    const entry = { bc, qty, sign, disp, memo, ts: Date.now(), by: S.me.name };
     S.movements = S.movements || []; S.movements.push(entry);
     await Net.put(P("stock_adj", rid("ADJ")), entry);
-    toast(`${DISP[disp]} · ${qty}개 조정됨`, "go");
+    const direction = sign > 0 ? "증가" : "감소";
+    toast(`${DISP[disp]} · ${qty}개 ${direction}`, "go");
     render();
   } catch (e) { writeFail(e); }
 }
@@ -1093,8 +1125,13 @@ function viewAdmin() {
         <div style="display:flex;align-items:end"><button class="btn primary" data-act="staff-add">PIN 만들기</button></div>
       </div></div></section>
     <section class="panel"><div class="panel-h"><h2>영수증 · 사전구매 안내</h2></div><div class="panel-b">
-      <label class="field">고객 영수증 안내 문구 (교환·반품·AS·고객센터)<textarea class="input" id="notice" rows="6">${esc(S.config.notice || DEFAULT_NOTICE)}</textarea></label>
-      <p class="note">고객센터 연락처(카카오톡 채널·전화)를 꼭 넣어 주세요.</p>
+      <div class="form-grid" style="margin-bottom:10px">
+        <label>보증서 발급 링크<input class="input" id="notice-guarantee" placeholder="https://app.vircle.co.kr/guarantee/issue/..." value="${esc(S.config.guaranteeUrl || "https://app.vircle.co.kr/guarantee/issue/1276?templateIdx=700/")}"></label>
+        <label>채팅 상담 링크<input class="input" id="notice-chat" placeholder="https://..." value="${esc(S.config.chatUrl || "")}"></label>
+        <label>전화번호<input class="input" id="notice-phone" placeholder="070-7666-9034" value="${esc(S.config.phone || "070-7666-9034")}"></label>
+      </div>
+      <label class="field">고객 영수증 안내 문구 (교환·반품·기타)<textarea class="input" id="notice" rows="6">${esc(S.config.notice || DEFAULT_NOTICE)}</textarea></label>
+      <p class="note">위 링크와 전화번호가 고객에게 보여질 때 클릭 가능한 형태로 표시돼요.</p>
       <details style="margin-top:10px"><summary>상품별 사전구매 발송 안내 (비우면 ‘입고 후 순차 발송’)</summary>
         <div style="display:grid;gap:6px;margin-top:8px">${names.map((n, k) => `<label class="form-grid" style="grid-template-columns:1fr 1fr;align-items:center"><span class="note">${esc(n)}</span><input class="input" data-note="${k}" value="${esc((S.config.notes || {})[n] || "")}" placeholder="예: 11월 말 순차 발송"></label>`).join("")}</div></details>
       <div style="margin-top:10px;display:flex;justify-content:flex-end"><button class="btn primary" data-act="notes-save">저장</button></div>
@@ -1136,7 +1173,21 @@ document.addEventListener("click", async e => {
   }
   else if (a === "sale-confirm") openConfirm();
   else if (a === "to-ship") { for (const c of S.cart) if (c.bc === d.bc && c.type === "pickup") c.type = "ship"; closeModal(); render(); toast("택배배송으로 바꿨어요. 다시 판매 확정을 눌러 주세요."); }
-  else if (a === "sale-commit") { const f = readConfirm(); if (f.err) { toast(f.err, "bad"); return; } b.disabled = true; commitSale(f); }
+  else if (a === "sale-commit") {
+    const f = readConfirm();
+    if (f.err) { toast(f.err, "bad"); return; }
+    const L = ledger();
+    const negativeItems = S.cart.filter(c => c.type === "pickup" && L.stock(c.bc) - c.qty < 0);
+    if (negativeItems.length > 0) {
+      const itemNames = negativeItems.map(c => S.byBc[c.bc]?.name || c.bc).join(", ");
+      if (!f.memo.includes("음수") && !f.memo.includes("부족") && !f.memo.includes("재고")) {
+        toast(`⚠️ 음수 주문 주의: ${itemNames}. 메모에 사유를 남겨주세요.`, "warn");
+        return;
+      }
+    }
+    b.disabled = true;
+    commitSale(f);
+  }
   else if (a === "order") openOrder(d.id);
   else if (a === "receipt") { const s = S.sales.find(x => x.id === d.id); if (s) showReceipt(s); }
   else if (a === "cancel-open") openCancel(d.id, d.k);
@@ -1222,7 +1273,7 @@ document.addEventListener("click", async e => {
   else if (a === "notes-save") {
     const names = [...new Set(S.products.map(p => p.name))], notes = {};
     document.querySelectorAll("[data-note]").forEach(x => { const v = x.value.trim(); if (v) notes[names[+x.dataset.note]] = v; });
-    saveConfig({ notes, notice: $("#notice").value.trim() });
+    saveConfig({ notes, notice: $("#notice").value.trim(), guaranteeUrl: $("#notice-guarantee").value.trim(), chatUrl: $("#notice-chat").value.trim(), phone: $("#notice-phone").value.trim() });
   }
   else if (a === "staff-load") loadStaff();
   else if (a === "staff-add") {
