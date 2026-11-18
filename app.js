@@ -250,6 +250,12 @@ function nextOrderNo(t = Date.now()) {
   return pre + String(max + 1).padStart(3, "0");
 }
 const preNote = p => (S.config.notes || {})[p.name] || "입고 후 순차 발송";
+const displayOrderNo = (orderNo) => {
+  if (!orderNo) return "";
+  if (orderNo.startsWith("HD_CC")) return orderNo;
+  if (orderNo.match(/^[A-Z]\d{6}-\d{3}$/)) return "HD_CC" + orderNo.slice(1);
+  return orderNo;
+};
 const pickupShort = () => {
   const L = ledger(), need = {};
   for (const c of S.cart) if (c.type === "pickup") need[c.bc] = (need[c.bc] || 0) + c.qty;
@@ -302,8 +308,8 @@ async function showReceipt(s) {
   if (cfg.chatUrl) links.push(`<a href="${cfg.chatUrl}" target="_blank" style="color:#1976d2;text-decoration:underline;font-weight:600">채팅 상담하기</a>`);
   if (phone) links.push(`<a href="tel:${phone.replace(/\D/g, '')}" style="color:#1976d2;text-decoration:underline;font-weight:600">${esc(phone)}</a>`);
   const linksHtml = links.length ? `<div style="margin-top:12px;padding:12px;background:#e3f2fd;border-radius:4px;text-align:center;border:1px solid #1976d2">${links.join(" · ")}</div>` : "";
-  openModal(`고객 영수증 · ${s.orderNo}`, `<div class="qr">
-      <div class="confirm-big">주문번호 <span class="num">${esc(s.orderNo)}</span> · ${won(s.total)}원</div>
+  openModal(`고객 영수증 · ${displayOrderNo(s.orderNo)}`, `<div class="qr">
+      <div class="confirm-big">주문번호 <span class="num">${esc(displayOrderNo(s.orderNo))}</span> · ${won(s.total)}원</div>
       <div id="qrbox"></div>
       <div class="note">고객 휴대폰 카메라로 QR을 찍으면 영수증이 열려요. 교환·환불 때 이 화면을 보여 달라고 안내해 주세요.</div>
       ${(S.config.notice || DEFAULT_NOTICE).split("\n").map(line => `<div class="note">${esc(line)}</div>`).join("")}
@@ -343,7 +349,7 @@ function openOrder(id) {
   const s = S.sales.find(x => x.id === id); if (!s) return;
   const canShipEdit = s.ship && s.items.some(it => it.type !== "pickup" && !it.exp && it.qty - it.cq > 0);
   const left = sum(s.items, it => it.qty - it.cq);
-  openModal(`주문 ${s.orderNo || s.id}`, `
+  openModal(`주문 ${displayOrderNo(s.orderNo) || s.id}`, `
     ${!s.hyundaiReceiptNo ? `<div class="banner warn" style="margin-bottom:8px">⚠️ 더현대 영수증 번호 미등록 · 반품 시 필요할 수 있어요</div>` : ""}
     <div class="filters" style="margin-bottom:8px">${stateChip(s)} ${typeChips(s)} <span class="note">${full(s.ts)} · 담당 ${esc(s.by || "—")}</span></div>
     <table><thead><tr><th>상품</th><th>유형</th><th class="r">수량</th><th class="r">금액</th><th>상태</th></tr></thead><tbody>
@@ -391,7 +397,7 @@ function openCancel(id, kind) {
       <td class="c"><select class="input" data-cqty="${i}">${Array.from({ length: left }, (_, k) => `<option value="${k + 1}" ${k + 1 === left ? "selected" : ""}>${k + 1}</option>`).join("")}</select> / ${left}</td>
       <td class="r num">${won(it.net / it.qty)}</td><td>${disp}</td></tr>`;
   }).join("");
-  openModal(`${kind === "exchange" ? "교환" : "취소·환불"} · ${s.orderNo}`, `
+  openModal(`${kind === "exchange" ? "교환" : "취소·환불"} · ${displayOrderNo(s.orderNo)}`, `
     ${late ? `<div class="banner bad">구매 후 ${days}일 지났어요 (기준 ${REFUND_DAYS}일). 본사 승인 사유를 반드시 기입하고 진행하세요.</div>` : `<div class="banner info">구매 ${days}일째 · 환불 가능 기간 안이에요.</div>`}
     ${kind === "exchange" ? `<p class="note">교환 = 원상품 취소 후 새 상품 판매예요. 여기서 돌려받는 상품을 고르면, 판매 화면에서 새 상품을 담아 확정할 때 두 주문이 연결돼요.</p>` : ""}
     <table style="margin-top:10px"><thead><tr><th></th><th>상품</th><th class="c">수량</th><th class="r">개당 금액</th><th>처리</th></tr></thead><tbody>${rows}</tbody></table>
@@ -820,7 +826,7 @@ function viewSell() {
         <div class="panel-h"><h2>오늘 판매</h2><span class="sub">${todays.length}건</span></div>
         <div class="list scroll" style="max-height:40vh">${todays.map(s => `<div class="list-item">
           <span class="num meta">${hm(s.ts)}</span>
-          <span class="grow ${s.state === "canceled" ? "canceled" : ""}">${esc(saleSummary(s))}<div class="meta">${esc(s.orderNo || "")}${s.custName ? ` · ${esc(s.custName)}` : ""} · ${typeChips(s)}</div></span>
+          <span class="grow ${s.state === "canceled" ? "canceled" : ""}">${esc(saleSummary(s))}<div class="meta">${esc(displayOrderNo(s.orderNo) || "")}${s.custName ? ` · ${esc(s.custName)}` : ""} · ${typeChips(s)}</div></span>
           <span class="num">${won(s.total - s.refunded)}</span>
           <button class="btn sm" data-act="order" data-id="${s.id}">보기</button>
         </div>`).join("") || `<div class="empty">아직 오늘 판매가 없어요.</div>`}</div>
@@ -837,7 +843,7 @@ function openConfirm() {
   }
   const pr = priceCart(S.cart, S.orderExc), needShip = S.cart.some(c => c.type !== "pickup"), searched = S.cart.some(c => c.via === "search");
   openModal("판매 확정", `
-    <div class="note">주문번호 <b class="num">${nextOrderNo()}</b> (확정 시 부여)${S.exchange ? ` · <b>교환 원주문 ${esc(S.exchange.orderNo)}</b>` : ""}</div>
+    <div class="note">주문번호 <b class="num">${displayOrderNo(nextOrderNo())}</b> (확정 시 부여)${S.exchange ? ` · <b>교환 원주문 ${esc(displayOrderNo(S.exchange.orderNo))}</b>` : ""}</div>
     <div class="confirm-big">${pr.qty}개 · ${won(pr.total)}원</div>
     ${pr.lines.map((l, i) => `<div class="confirm-line ${l.c.via === "search" ? "search" : ""}">
       <div><div class="note">${esc(l.p.name)} · <span class="chip t-${l.c.type}">${TYPES[l.c.type]}</span>${l.c.via === "search" ? ` <span class="chip warn">검색으로 담음 · 실물 택 확인</span>` : ""}</div>
@@ -887,7 +893,7 @@ function viewOrders() {
   const rows = Object.entries(byDate).sort((a, b) => b[0].localeCompare(a[0])).flatMap(([date, orders]) => {
     const dateRow = `<tr style="background:#2a2f38"><td colspan="10" style="padding:8px;font-weight:bold;color:#4a9eff">${date}</td></tr>`;
     const orderRows = orders.map(s => `<tr>
-        <td class="num">${hm(s.ts)}</td><td class="mono">${esc(s.orderNo || s.id)}</td>
+        <td class="num">${hm(s.ts)}</td><td class="mono">${esc(displayOrderNo(s.orderNo) || s.id)}</td>
         <td class="mono" style="color:#4a9eff">${s.hyundaiReceiptNo ? esc(s.hyundaiReceiptNo) : `<button class="btn sm orange" data-act="receipt-edit" data-id="${s.id}">영수증 NO 입력</button>`}</td>
         <td>${esc(s.custName || "—")}<div class="note">${esc(s.custPhone || "")}</div></td>
         <td class="name-cell">${esc(saleSummary(s))}${s.excWarn ? ` <span class="chip warn">⚠ 예외할인</span>` : ""}${s.memo ? ` <span class="chip">메모</span>` : ""}</td>
@@ -921,7 +927,7 @@ function viewShip() {
     <div class="panel-b note">이지어드민 수기발주 양식(발송일·주문번호·상품코드·품목코드·상품명·옵션·수량·수령자명·수령자전화번호·수령자주소·메모)으로 내보내요. 주문번호는 POS 번호를 양식 형태로 바꿔 넣고(C261127-001 → 261127_C001), 메모는 ‘판매일_매장명 출고’예요. 택배와 사전구매는 파일이 따로 나가고(사전구매 주문번호 끝에 P), 같은 주문번호끼리 합포돼요. 내보낸 줄은 ‘등록 완료’로 바뀌어 다시 나가지 않아요(중복 발주 방지).</div>
     <div class="scroll" style="max-height:60vh"><table>
       <thead><tr><th>주문번호</th><th>유형</th><th>수령자</th><th>주소</th><th>상품</th><th class="r">수량</th><th>상태</th><th></th></tr></thead>
-      <tbody>${list.map(x => `<tr><td class="mono"><button class="btn sm" data-act="order" data-id="${x.s.id}">${esc(x.s.orderNo)}</button></td>
+      <tbody>${list.map(x => `<tr><td class="mono"><button class="btn sm" data-act="order" data-id="${x.s.id}">${esc(displayOrderNo(x.s.orderNo))}</button></td>
         <td><span class="chip t-${x.it.type}">${TYPES[x.it.type]}</span></td>
         <td>${esc((x.s.ship || {}).name || x.s.custName)}<div class="note">${esc((x.s.ship || {}).phone || "")}</div></td>
         <td class="name-cell note">${esc((x.s.ship || {}).addr || "—")}</td>
@@ -1080,8 +1086,8 @@ function viewReport() {
       ${kv(`취소·환불 (${cl.cn}건)`, won(cl.refund), cl.refund ? "bad-txt" : "")}${kv("순매출", won(cl.netSales))}${kv("현장 / 택배 / 사전", `${won(cl.byType.pickup)} / ${won(cl.byType.ship)} / ${won(cl.byType.pre)}`)}
     </div>
     ${flagged.length || cancels.length ? `<section class="panel"><div class="panel-h"><h2>확인할 주문</h2><span class="sub">예외할인 · 메모 · 실결제 차이 · 취소</span></div><div class="list">
-      ${flagged.map(s => `<div class="list-item"><span class="num meta">${hm(s.ts)}</span><span class="grow"><b>${esc(s.orderNo)}</b> ${esc(saleSummary(s))}<div class="meta">${s.excDisc ? `<span class="warn-txt">예외할인 ${won(s.excDisc)}${s.excWarn ? " ⚠" : ""}</span> · ` : ""}${s.paid !== s.total ? `실결제 ${won(s.paid)} (판매 ${won(s.total)}) · ` : ""}${s.memo ? esc(s.memo) : ""}</div></span><button class="btn sm" data-act="order" data-id="${s.id}">보기</button></div>`).join("")}
-      ${cancels.map(({ s, c }) => `<div class="list-item"><span class="num meta">${hm(c.ts)}</span><span class="grow"><span class="chip bad">${c.kind === "exchange" ? "교환" : "취소"}</span> <b>${esc(s.orderNo)}</b> 환불 ${won(c.refund)}원<div class="meta">${esc(c.reason || "")} · ${esc(c.by || "")}</div></span><button class="btn sm" data-act="order" data-id="${s.id}">보기</button></div>`).join("")}
+      ${flagged.map(s => `<div class="list-item"><span class="num meta">${hm(s.ts)}</span><span class="grow"><b>${esc(displayOrderNo(s.orderNo))}</b> ${esc(saleSummary(s))}<div class="meta">${s.excDisc ? `<span class="warn-txt">예외할인 ${won(s.excDisc)}${s.excWarn ? " ⚠" : ""}</span> · ` : ""}${s.paid !== s.total ? `실결제 ${won(s.paid)} (판매 ${won(s.total)}) · ` : ""}${s.memo ? esc(s.memo) : ""}</div></span><button class="btn sm" data-act="order" data-id="${s.id}">보기</button></div>`).join("")}
+      ${cancels.map(({ s, c }) => `<div class="list-item"><span class="num meta">${hm(c.ts)}</span><span class="grow"><span class="chip bad">${c.kind === "exchange" ? "교환" : "취소"}</span> <b>${esc(displayOrderNo(s.orderNo))}</b> 환불 ${won(c.refund)}원<div class="meta">${esc(c.reason || "")} · ${esc(c.by || "")}</div></span><button class="btn sm" data-act="order" data-id="${s.id}">보기</button></div>`).join("")}
     </div></section>` : ""}
     <div class="cols" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
       <section class="panel"><div class="panel-h"><h2>일매출</h2><span class="sub">순매출 = 판매금액 − 그날 환불</span></div>
