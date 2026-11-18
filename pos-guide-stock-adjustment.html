@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>어반사이드 POS · 재고 조정 가이드</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --border: #e0e0e0;
+  --accent: #d32f2f;
+  --success: #388e3c;
+  --info: #1976d2;
+  --warning: #f57c00;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1e1e1e;
+    --fg: #e0e0e0;
+    --border: #404040;
+    --accent: #ff5252;
+    --success: #66bb6a;
+    --info: #42a5f5;
+    --warning: #ffb74d;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1e1e1e;
+  --fg: #e0e0e0;
+  --border: #404040;
+  --accent: #ff5252;
+  --success: #66bb6a;
+  --info: #42a5f5;
+  --warning: #ffb74d;
+  color-scheme: dark;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); padding: 2rem 1.5rem; }
+h1 { font-size: 2rem; margin: 2rem 0 1rem; }
+h2 { font-size: 1.5rem; margin: 1.5rem 0 1rem; border-bottom: 2px solid var(--accent); padding-bottom: 0.5rem; }
+h3 { font-size: 1.1rem; margin: 1.5rem 0 0.75rem; }
+p, ul { margin: 1rem 0; }
+li { margin: 0.5rem 0 0.5rem 1.5rem; }
+code { background: var(--border); padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; }
+.section { max-width: 900px; margin: 0 auto; }
+.step {
+  border-left: 4px solid var(--accent);
+  background: var(--border);
+  padding: 1rem;
+  margin: 1rem 0;
+  border-radius: 4px;
+}
+.note {
+  background: rgba(66, 165, 245, 0.1);
+  border-left: 4px solid var(--info);
+  padding: 1rem;
+  margin: 1rem 0;
+  border-radius: 4px;
+}
+.warning {
+  background: rgba(255, 152, 0, 0.1);
+  border-left: 4px solid var(--warning);
+  padding: 1rem;
+  margin: 1rem 0;
+  border-radius: 4px;
+}
+.success {
+  background: rgba(56, 142, 60, 0.1);
+  border-left: 4px solid var(--success);
+  padding: 1rem;
+  margin: 1rem 0;
+  border-radius: 4px;
+}
+table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: var(--border); font-weight: 600; }
+.btn {
+  background: var(--accent);
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.btn:hover { opacity: 0.9; }
+.btn-success { background: var(--success); }
+.btn-info { background: var(--info); }
+.example { background: var(--border); padding: 1rem; border-radius: 4px; margin: 1rem 0; }
+</style>
+</head>
+<body>
+<div class="section">
+
+<h1>어반사이드 POS 재고 조정 가이드 📦</h1>
+
+<p><strong>최종 업데이트:</strong> 2026-11-16 · <strong>기능:</strong> 실사 보정, 불량 분리, 반품 처리, 분실 처리</p>
+
+<h2>🎯 재고 조정이란?</h2>
+
+<p>판매, 입고 외에 발생하는 재고 변화를 기록합니다:</p>
+
+<ul>
+  <li><strong>실사 보정 (Adjust):</strong> 실제 현장 재고와 시스템 수량이 맞지 않을 때</li>
+  <li><strong>불량 분리 (Defect):</strong> 불량 상품을 발견하고 분리했을 때</li>
+  <li><strong>본사 반송 (Return):</strong> 본사로 반품 처리할 상품</li>
+  <li><strong>정상 복구 (Restock):</strong> 반품 처리 후 정상 복구</li>
+  <li><strong>분실 처리 (Lost):</strong> 분실, 손상 등으로 더 이상 판매 불가</li>
+</ul>
+
+<div class="note">
+  <strong>💡 중요:</strong> 모든 조정은 본사에 즉시 알려집니다. 조정 내용이 본사로 전송되어 기록으로 남겨집니다.
+</div>
+
+<h2>🔧 재고 조정 사용 방법</h2>
+
+<h3>Step 1: 재고 현황 화면 열기</h3>
+
+<div class="step">
+  <p><strong>메뉴:</strong> 하단 네비게이션 → <code>재고 현황</code></p>
+  <p>현재 매장의 모든 상품 재고 목록이 표시됩니다.</p>
+</div>
+
+<h3>Step 2: 조정할 상품 찾기</h3>
+
+<div class="step">
+  <p><strong>검색:</strong> 화면 상단 검색창에 상품명, 컬러, 코드 입력</p>
+  <ul>
+    <li>예: "에일러론 블랙" → 해당 상품만 필터</li>
+    <li>예: "S04188" → 이지어드민 코드로 검색</li>
+  </ul>
+</div>
+
+<h3>Step 3: "조정" 버튼 클릭</h3>
+
+<div class="step">
+  <p><strong>테이블:</strong> 각 상품 행의 맨 끝 → <code>조정</code> 버튼</p>
+</div>
+
+<h3>Step 4: 재고 조정 모달 채우기</h3>
+
+<div class="example">
+  <h4>📋 조정 모달 항목:</h4>
+  <table>
+    <tr>
+      <th>항목</th>
+      <th>설명</th>
+      <th>예시</th>
+    </tr>
+    <tr>
+      <td><strong>현재 재고</strong></td>
+      <td>시스템에 기록된 현재 수량 (읽기만)</td>
+      <td><code>2개</code></td>
+    </tr>
+    <tr>
+      <td><strong>처리 방법</strong></td>
+      <td>조정 사유 선택</td>
+      <td>실사 보정, 불량 분리, 본사 반송 등</td>
+    </tr>
+    <tr>
+      <td><strong>조정 방향</strong></td>
+      <td><code>감소 (-)</code> 또는 <code>증가 (+)</code></td>
+      <td>실사 후 더 많으면 증가 선택</td>
+    </tr>
+    <tr>
+      <td><strong>조정 수량</strong></td>
+      <td>증가/감소시킬 개수</td>
+      <td><code>3</code></td>
+    </tr>
+    <tr>
+      <td><strong>조정 후 (미리보기)</strong></td>
+      <td>조정 후 최종 재고 (자동 계산)</td>
+      <td><code>2 → 5개</code></td>
+    </tr>
+    <tr>
+      <td><strong>메모</strong></td>
+      <td>선택: 조정 사유 상세 기록</td>
+      <td>"실사 결과 재고 초과 발견"</td>
+    </tr>
+  </table>
+</div>
+
+<h2>✅ 실제 사용 예시</h2>
+
+<div class="success">
+  <h3>예시 1: 실사 보정 (재고가 더 많음)</h3>
+  <p><strong>상황:</strong> 에일러론 블랙 S 실제 재고 5개인데 시스템엔 2개</p>
+  <ul>
+    <li>현재 재고: <code>2개</code></li>
+    <li>처리 방법: <code>실사 보정</code> 선택</li>
+    <li>조정 방향: <code>증가 (+)</code> 클릭</li>
+    <li>조정 수량: <code>3</code> 입력</li>
+    <li><strong>결과:</strong> 2개 → <span style="color: var(--success);">5개</span> (미리보기에 표시)</li>
+    <li>메모: "11/16 실사 결과 재고 초과" (필수 아님)</li>
+    <li>저장 클릭 → ✅ 완료</li>
+  </ul>
+</div>
+
+<div class="success">
+  <h3>예시 2: 불량 분리 (5개 중 2개 불량 발견)</h3>
+  <p><strong>상황:</strong> 에일러론 블랙 M 5개 중 불량 2개 발견</p>
+  <ul>
+    <li>현재 재고: <code>5개</code></li>
+    <li>처리 방법: <code>불량 분리</code> 선택</li>
+    <li>조정 방향: <code>감소 (-)</code> 클릭</li>
+    <li>조정 수량: <code>2</code> 입력</li>
+    <li><strong>결과:</strong> 5개 → <span style="color: var(--warning);">3개</span> (미리보기에 표시)</li>
+    <li>메모: "지퍼 불량 2개 발견, 본사 보험 처리 예정"</li>
+    <li>저장 클릭 → ✅ 완료</li>
+  </ul>
+</div>
+
+<h2>⚡ 핵심 기능</h2>
+
+<div class="note">
+  <h3>🎨 조정 후 미리보기</h3>
+  <p>수량을 입력하면 <strong>실시간</strong>으로 조정 후 최종 재고가 표시됩니다.</p>
+  <ul>
+    <li><code>현재 재고</code>: 2개</li>
+    <li><code>조정 후</code>: 2개 → <strong>5개</strong> (증가 선택, 수량 3)</li>
+  </ul>
+</div>
+
+<div class="note">
+  <h3>✅ 현재고 즉시 반영</h3>
+  <p>조정 저장 → 현재 매장 재고 KPI가 즉시 업데이트됩니다.</p>
+  <ul>
+    <li>이전: 281개 SKU</li>
+    <li>조정 후: 284개 SKU (+3개)</li>
+  </ul>
+</div>
+
+<div class="note">
+  <h3>📊 본사 알림</h3>
+  <p>모든 조정은 본사로 자동 전송되며, 본사에서 나중에 확인할 수 있습니다.</p>
+</div>
+
+<h2>🚨 주의사항</h2>
+
+<ul>
+  <li>❌ 조정 후 수량이 <strong>음수</strong>가 될 수 없습니다 (예: 현재 2개인데 3개 감소 불가)</li>
+  <li>❌ 한 번 저장된 조정은 <strong>수정 불가</strong> (다시 조정하려면 반대 방향으로 조정)</li>
+  <li>✅ 조정 메모는 <strong>선택사항</strong>이지만 가능한 상세히 기록해주세요</li>
+  <li>⚠️ 조정할 때마다 <strong>본사에 알린다</strong는 것을 꼭 기억하세요</li>
+</ul>
+
+<div class="warning">
+  <h3>⚠️ 본사 알림이 강조됩니다!</h3>
+  <p>모달 하단에 경고 메시지가 표시됩니다:</p>
+  <p><code>⚠️ 중요: 본사에 반드시 알림하세요!</code></p>
+  <p><code>이 조정 내용이 본사로 전송되며 기록으로 남겨집니다.</code></p>
+  <p>조정 직후 <strong>카톡/전화</strong>로 본사에 별도 보고하는 것을 권장합니다.</p>
+</div>
+
+<h2>📈 현장에서 자주 사용하는 경우</h2>
+
+<table>
+  <tr>
+    <th>상황</th>
+    <th>처리 방법</th>
+    <th>조정 방향</th>
+  </tr>
+  <tr>
+    <td>실사 후 재고 초과 발견</td>
+    <td>실사 보정</td>
+    <td>증가 (+)</td>
+  </tr>
+  <tr>
+    <td>실사 후 재고 부족 발견</td>
+    <td>실사 보정</td>
+    <td>감소 (-)</td>
+  </tr>
+  <tr>
+    <td>불량 상품 발견</td>
+    <td>불량 분리</td>
+    <td>감소 (-)</td>
+  </tr>
+  <tr>
+    <td>고객 반품 (정상)</td>
+    <td>정상 복구</td>
+    <td>증가 (+)</td>
+  </tr>
+  <tr>
+    <td>본사로 반품 처리</td>
+    <td>본사 반송</td>
+    <td>감소 (-)</td>
+  </tr>
+  <tr>
+    <td>분실/손상</td>
+    <td>분실 처리</td>
+    <td>감소 (-)</td>
+  </tr>
+</table>
+
+<h2>✨ 완료!</h2>
+
+<div class="success">
+  <p><strong>조정이 완료되었습니다!</strong></p>
+  <ul>
+    <li>✅ 조정 내용이 저장됨</li>
+    <li>✅ 현재고가 즉시 반영됨</li>
+    <li>✅ 본사에 자동 전송됨</li>
+    <li>✅ 재고 이동 내역 기록에 남겨짐</li>
+  </ul>
+</div>
+
+</div>
+</body>
+</html>
