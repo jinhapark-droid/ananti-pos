@@ -315,13 +315,15 @@ async function showReceipt(s) {
   if (cfg.chatUrl) links.push(`<button onclick="window.open('${cfg.chatUrl}', '_blank')" style="color:#1976d2;text-decoration:underline;border:none;background:none;cursor:pointer;font-weight:600;padding:0;font-size:inherit;font-family:inherit">채팅 상담</button>`);
   if (phone) links.push(`<button onclick="window.location.href='tel:${phone.replace(/\D/g, '')}'" style="color:#1976d2;text-decoration:underline;border:none;background:none;cursor:pointer;font-weight:600;padding:0;font-size:inherit;font-family:inherit">${esc(phone)}</button>`);
   const linksHtml = links.length ? `<div style="margin-top:12px;padding:12px;background:#e3f2fd;border-radius:4px;text-align:center;border:1px solid #1976d2">${links.join(" · ")}</div>` : "";
+  const noticeText = S.config.notice || DEFAULT_NOTICE;
+  const noticeUntilAsSection = noticeText.split(/\n■\s*A\/S/)[0];
   openModal(`고객 영수증 · ${displayOrderNo(s.orderNo)}`, `<div class="qr">
       <div class="confirm-big">주문번호 <span class="num">${esc(displayOrderNo(s.orderNo))}</span> · ${won(s.total)}원</div>
       <div id="qrbox"></div>
       <div class="note">고객 휴대폰 카메라로 QR을 찍으면 영수증이 열려요. 교환·환불 때 이 화면을 보여 달라고 안내해 주세요.</div>
-      ${(S.config.notice || DEFAULT_NOTICE).split("\n").map(line => `<div class="note">${esc(line)}</div>`).join("")}
+      ${noticeUntilAsSection.split("\n").map(line => `<div class="note">${esc(line)}</div>`).join("")}
       ${linksHtml}
-      <div class="note mono" style="word-break:break-all;margin-top:12px">${esc(url)}</div></div>`,
+      <div class="note mono" style="word-break:break-all;margin-top:12px"><a href="${esc(url)}" target="_blank" style="color:var(--accent);text-decoration:underline">${esc(url)}</a></div></div>`,
     `<button class="btn" data-act="copy" data-v="${esc(url)}">링크 복사</button><button class="btn primary" data-act="close" data-autofocus>닫기 (Enter)</button>`);
   try { new QRCode($("#qrbox"), { text: url, width: 200, height: 200 }); } catch (e) { $("#qrbox").textContent = "QR을 만들지 못했어요. 링크를 복사해 보내 주세요."; }
 }
