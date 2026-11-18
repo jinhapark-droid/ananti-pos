@@ -103,7 +103,7 @@ const S = {
   me: null, store: ls("pos.store") || "",
   products: [], byBc: {}, byEz: {}, byCode: {}, config: null,
   sales: [], receipts: [], requests: [], loaded: false,
-  cart: [], orderExc: null, exchange: null, tab: "sell",
+  cart: [], orderExc: null, orderEmpDisc: null, empVerified: false, exchange: null, tab: "sell",
   stockFilter: { q: "", mode: "all" }, reqDraft: {}, reqFilter: { q: "", mode: "sold" }, reqMemo: "", upload: null,
   reportDay: "", closeDay: dayKey(Date.now()), lookupQ: "", shipMode: "todo", lowLine: 0, staff: null,
 };
@@ -214,10 +214,17 @@ function priceCart(cart, orderExc) {
     orderExcAmt = Math.max(0, Math.min(room, Math.floor(orderExc.kind === "pct" ? room * orderExc.v / 100 : orderExc.v)));
     allocate(lines, lines.map(l => l.base - l.promo - l.exc), orderExcAmt, "exc");
   }
-  for (const l of lines) l.net = l.base - l.promo - l.exc;
+  let empDiscAmt = 0;
+  if (S.orderEmpDisc) {
+    const room = sum(lines, l => l.base - l.promo - l.exc);
+    empDiscAmt = Math.max(0, Math.min(room, Math.floor(room * 0.05)));
+    allocate(lines, lines.map(l => l.base - l.promo - l.exc), empDiscAmt, "emp");
+  }
+  for (const l of lines) l.net = l.base - l.promo - l.exc - (l.emp || 0);
   const excTotal = sum(lines, l => l.exc);
+  const empTotal = sum(lines, l => l.emp || 0);
   return {
-    lines, gross, sale, baseDisc: gross - sale, promoTotal, excTotal, orderExcAmt, total: sum(lines, l => l.net), qty: sum(lines, l => l.c.qty),
+    lines, gross, sale, baseDisc: gross - sale, promoTotal, excTotal, orderExcAmt, empTotal, empDiscAmt, total: sum(lines, l => l.net), qty: sum(lines, l => l.c.qty),
     basisAmt, hit, promo, gap: promo.on ? Math.max(0, (promo.threshold || 0) - basisAmt) : 0,
     warn: excTotal > 0 && (excTotal > gross * EXC_WARN_RATE || excTotal > EXC_WARN_AMT),
   };
@@ -821,7 +828,9 @@ function viewSell() {
         <div class="k sub">예외 할인</div><div class="v sub" style="${pr.excTotal ? "color:var(--warn)" : ""}">−${won(pr.excTotal)}${pr.warn ? " ⚠" : ""}</div>
         <div class="k pay">판매금액</div><div class="v pay">${won(pr.total)}</div>
       </div>
-      <div class="panel-b"><button class="btn sm" data-act="exc" data-i="order" ${S.cart.length ? "" : "disabled"}>${S.orderExc ? `주문 예외할인 수정 (${S.orderExc.kind === "pct" ? S.orderExc.v + "%" : won(S.orderExc.v) + "원"})` : "주문 전체 예외할인"}</button></div></section>
+      <div class="panel-b"><button class="btn sm" data-act="exc" data-i="order" ${S.cart.length ? "" : "disabled"}>${S.orderExc ? `주문 예외할인 수정 (${S.orderExc.kind === "pct" ? S.orderExc.v + "%" : won(S.orderExc.v) + "원"})` : "주문 전체 예외할인"}</button></div>
+      <div class="panel-b"><button class="btn sm" data-act="emp-disc" ${S.cart.length ? "" : "disabled"} style="background:${S.orderEmpDisc ? "var(--go)" : "var(--line)"};color:${S.orderEmpDisc ? "white" : "inherit"}">임직원 추가 할인 5%${S.orderEmpDisc ? " ✓" : ""}</button></div>
+      <div class="panel-b"><label class="check"><input type="checkbox" id="emp-verified" ${S.empVerified ? "checked" : ""} data-act="emp-verify"> <span>사원증을 확인하였습니다</span></label></div></section>
       <section class="panel">
         <div class="panel-h"><h2>오늘 판매</h2><span class="sub">${todays.length}건</span></div>
         <div class="list scroll" style="max-height:40vh">${todays.map(s => `<div class="list-item">
@@ -1180,6 +1189,8 @@ document.addEventListener("click", async e => {
     if (d.i === "order") S.orderExc = x; else S.cart[+d.i].exc = x;
     closeModal(); render();
   }
+  else if (a === "emp-disc") { S.orderEmpDisc = !S.orderEmpDisc; render(); }
+  else if (a === "emp-verify") { S.empVerified = !S.empVerified; render(); }
   else if (a === "sale-confirm") openConfirm();
   else if (a === "to-ship") { for (const c of S.cart) if (c.bc === d.bc && c.type === "pickup") c.type = "ship"; closeModal(); render(); toast("택배배송으로 바꿨어요. 다시 판매 확정을 눌러 주세요."); }
   else if (a === "sale-commit") {
