@@ -215,7 +215,7 @@ function priceCart(cart, orderExc) {
     allocate(lines, lines.map(l => l.base - l.promo - l.exc), orderExcAmt, "exc");
   }
   let empDiscAmt = 0;
-  if (S.orderEmpDisc) {
+  if (S.orderEmpDisc && S.empVerified) {
     const room = sum(lines, l => l.base - l.promo - l.exc);
     empDiscAmt = Math.max(0, Math.min(room, Math.floor(room * 0.05)));
     allocate(lines, lines.map(l => l.base - l.promo - l.exc), empDiscAmt, "emp");
