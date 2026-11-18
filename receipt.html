@@ -63,8 +63,7 @@ const mask = n => !n ? "" : n.length <= 2 ? n[0] + "*" : n[0] + "*".repeat(n.len
       <div class="row total"><span>판매금액</span><span class="num">${won(s.total)}</span></div>
       ${refunded ? `<div class="row cx"><span>일부 상품이 취소·환불됐어요</span><span></span></div>` : ""}
       ${s.exchangeOf ? `<div class="store">교환 주문 (원주문 ${esc(s.exchangeOf.orderNo)})</div>` : ""}
-      <div class="notice">${linkify(cfg.notice || DEFAULT_NOTICE)}</div>
-      <div class="store" style="margin-top:12px;font-size:12px">결제는 매장 단말기 영수증 기준이며, 이 영수증은 구매 내역 확인용이에요.</div>`;
+      <div class="notice">${linkify(cfg.notice || DEFAULT_NOTICE)}</div>`;
   } catch (e) { box.innerHTML = `<div class="empty">인터넷 연결을 확인하고 다시 열어 주세요.</div>`; }
 })();
 </script>
