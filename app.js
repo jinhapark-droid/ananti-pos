@@ -304,9 +304,9 @@ async function showReceipt(s) {
   const links = [];
   const guaranteeUrl = cfg.guaranteeUrl || "https://app.vircle.co.kr/guarantee/issue/1276?templateIdx=700/";
   const phone = cfg.phone || "070-7666-9034";
-  if (guaranteeUrl) links.push(`<button class="btn sm" onclick="window.open('${guaranteeUrl}', '_blank')" style="cursor:pointer">보증서 발급</button>`);
-  if (cfg.chatUrl) links.push(`<button class="btn sm" onclick="window.open('${cfg.chatUrl}', '_blank')" style="cursor:pointer">채팅 상담</button>`);
-  if (phone) links.push(`<button class="btn sm" onclick="window.location.href='tel:${phone.replace(/\D/g, '')}'" style="cursor:pointer">${esc(phone)}</button>`);
+  if (guaranteeUrl) links.push(`<span onclick="window.open('${guaranteeUrl}', '_blank')" style="color:#1976d2;text-decoration:underline;cursor:pointer;font-weight:600">보증서 발급</span>`);
+  if (cfg.chatUrl) links.push(`<span onclick="window.open('${cfg.chatUrl}', '_blank')" style="color:#1976d2;text-decoration:underline;cursor:pointer;font-weight:600">채팅 상담</span>`);
+  if (phone) links.push(`<span onclick="window.location.href='tel:${phone.replace(/\D/g, '')}'" style="color:#1976d2;text-decoration:underline;cursor:pointer;font-weight:600">${esc(phone)}</span>`);
   const linksHtml = links.length ? `<div style="margin-top:12px;padding:12px;background:#e3f2fd;border-radius:4px;text-align:center;border:1px solid #1976d2">${links.join(" · ")}</div>` : "";
   openModal(`고객 영수증 · ${displayOrderNo(s.orderNo)}`, `<div class="qr">
       <div class="confirm-big">주문번호 <span class="num">${esc(displayOrderNo(s.orderNo))}</span> · ${won(s.total)}원</div>
@@ -1128,6 +1128,11 @@ function viewAdmin() {
         <label>매장<select class="input" id="sf-store">${S.config.stores.map(s => `<option value="${esc(s.id)}" ${s.id === S.store ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>
         <div style="display:flex;align-items:end"><button class="btn primary" data-act="staff-add">PIN 만들기</button></div>
       </div></div></section>
+    <section class="panel"><div class="panel-h"><h2>설정</h2></div><div class="panel-b">
+      <div class="form-grid" style="margin-bottom:10px">
+        <label>매장 코드 (주문번호 접두어)<input class="input" id="config-code" placeholder="HD_CC" value="${esc(S.config.stores && S.config.stores[0] ? S.config.stores[0].code : "HD_CC")}"></label>
+      </div>
+    </section>
     <section class="panel"><div class="panel-h"><h2>영수증 · 사전구매 안내</h2></div><div class="panel-b">
       <div class="form-grid" style="margin-bottom:10px">
         <label>보증서 발급 링크<input class="input" id="notice-guarantee" placeholder="https://app.vircle.co.kr/guarantee/issue/..." value="${esc(S.config.guaranteeUrl || "https://app.vircle.co.kr/guarantee/issue/1276?templateIdx=700/")}"></label>
@@ -1277,7 +1282,8 @@ document.addEventListener("click", async e => {
   else if (a === "notes-save") {
     const names = [...new Set(S.products.map(p => p.name))], notes = {};
     document.querySelectorAll("[data-note]").forEach(x => { const v = x.value.trim(); if (v) notes[names[+x.dataset.note]] = v; });
-    saveConfig({ notes, notice: $("#notice").value.trim(), guaranteeUrl: $("#notice-guarantee").value.trim(), chatUrl: $("#notice-chat").value.trim(), phone: $("#notice-phone").value.trim() });
+    const newCode = $("#config-code").value.trim() || "HD_CC";
+    saveConfig({ stores: S.config.stores.map(s => ({...s, code: newCode})), notes, notice: $("#notice").value.trim(), guaranteeUrl: $("#notice-guarantee").value.trim(), chatUrl: $("#notice-chat").value.trim(), phone: $("#notice-phone").value.trim() });
   }
   else if (a === "staff-load") loadStaff();
   else if (a === "staff-add") {
