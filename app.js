@@ -117,7 +117,7 @@ function derive() {
   S.products = cat && Array.isArray(cat.products) ? cat.products : [];
   S.byBc = {}; S.byEz = {}; S.byCode = {};
   for (const p of S.products) { S.byBc[p.bc] = p; S.byEz[normEz(p.ez)] = p; S.byCode[String(p.code).toUpperCase()] = p; }
-  S.config = d["config/main"] || { stores: [{ id: "chungcheong", name: "더현대 충청", code: "C" }], notes: {}, notice: "" };
+  S.config = d["config/main"] || { stores: [{ id: "chungcheong", name: "더현대 충청", code: "HD_CC" }], notes: {}, notice: "" };
   if (S.me && S.me.role === "store") S.store = S.me.store;
   if (!(S.config.stores || []).some(s => s.id === S.store)) S.store = ((S.config.stores || [])[0] || {}).id || "";
   ls("pos.store", S.store);
@@ -835,12 +835,6 @@ function viewSell() {
 }
 function openConfirm() {
   const short = pickupShort();
-  if (short.length) {
-    openModal("현장 재고가 부족해요", `<p>아래 상품은 현장 재고보다 많이 담겼어요. 택배배송으로 바꾸거나 수량을 줄여 주세요.</p>
-      <table><tbody>${short.map(x => { const p = S.byBc[x.bc]; return `<tr><td class="name-cell"><b>${esc(p.name)}</b> ${esc(optLabel(p))}</td><td class="r">현장 재고 <b class="num">${x.st}</b> / 담은 수량 <b class="num">${x.q}</b></td><td><button class="btn sm" data-act="to-ship" data-bc="${x.bc}">택배로 바꾸기</button></td></tr>`; }).join("")}</tbody></table>
-      <p class="note">“현장엔 없는데 택배로는 가능해요” → 고객이 동의하면 택배로 바꿔 주세요.</p>`, `<button class="btn" data-act="close">돌아가기</button>`);
-    return;
-  }
   const pr = priceCart(S.cart, S.orderExc), needShip = S.cart.some(c => c.type !== "pickup"), searched = S.cart.some(c => c.via === "search");
   openModal("판매 확정", `
     <div class="note">주문번호 <b class="num">${displayOrderNo(nextOrderNo())}</b> (확정 시 부여)${S.exchange ? ` · <b>교환 원주문 ${esc(displayOrderNo(S.exchange.orderNo))}</b>` : ""}</div>
@@ -875,8 +869,10 @@ function openConfirm() {
 function readConfirm() {
   const v = id => ($(id) ? $(id).value.trim() : "");
   const needShip = S.cart.some(c => c.type !== "pickup");
+  const short = pickupShort();
   const f = { name: v("#f-name"), phone: fmtPhone(v("#f-phone")), paid: parseInt(digits(v("#f-paid")), 10) || 0, memo: v("#f-memo"), hyundaiReceiptNo: v("#f-receipt-no") || null };
   if ($("#f-optok") && !$("#f-optok").checked) return { err: "검색으로 담은 상품의 컬러·사이즈를 확인하고 체크해 주세요." };
+  if (short.length && !f.memo) return { err: "현장 재고 부족: 메모에 사유를 필수 작성해 주세요." };
   if (needShip) {
     Object.assign(f, { rname: v("#f-rname") || f.name, rphone: fmtPhone(v("#f-rphone")) || f.phone, addr: v("#f-addr"), smemo: v("#f-smemo") });
     if (!f.name || digits(f.phone).length < 9) return { err: "택배·사전구매는 주문자 성함과 연락처가 필요해요." };
