@@ -420,7 +420,9 @@ function openCancel(id, kind) {
         <div><div class="note" style="font-size:12px;margin-bottom:4px">환불액</div><div class="num" style="font-size:18px;font-weight:bold" id="c-refund-display">0원</div></div>
         <div><div class="note" style="font-size:12px;margin-bottom:4px" id="c-hyundai-label">더현대 재결제</div><div class="num" style="font-size:18px;font-weight:bold;color:var(--accent)" id="c-hyundai-display">0원</div></div>
       </div>
-      <div id="c-promo-box" style="display:none;padding:8px;background:rgba(255,152,0,0.1);border-radius:4px"><span style="font-size:12px" id="c-promo-msg"></span></div>
+      <div id="c-promo-box" style="display:none;padding:8px;background:rgba(255,152,0,0.1);border-radius:4px;margin-top:8px">
+        <label class="check" style="margin:0"><input type="checkbox" id="c-revoke-promo"> <span style="font-size:12px" id="c-promo-msg"></span></label>
+      </div>
     </div>
     <div class="box"><h4>확인 (모두 체크해야 진행돼요)</h4>
       <label class="check"><input type="checkbox" data-cchk> 택이 붙어 있고 착용하지 않았어요</label>
@@ -431,30 +433,55 @@ function openCancel(id, kind) {
     ${RULES}`,
     `<button class="btn" data-act="close">돌아가기</button><button class="btn primary" data-act="cancel-do" data-id="${s.id}" data-k="${kind}">${kind === "exchange" ? "원상품 취소하고 새 상품 담기" : "취소·환불 기록"}</button>`);
   const recalc = () => {
-    let cancelAmt = 0, remainItemNet = 0;
+    let cancelAmt = 0, remainItemNet = 0, remainItemGross = 0;
     s.items.forEach((it, i) => {
       const ck = $(`[data-cpick="${i}"]`);
       const qty = +$(`[data-cqty="${i}"]`).value || 0;
       if (ck && ck.checked) {
         cancelAmt += Math.round(it.net / it.qty * qty);
       } else {
+        const itemGross = it.price * it.qty;
+        const itemBaseDisc = itemGross - (it.base / it.qty * it.qty);
+        remainItemGross += Math.round(itemGross - itemBaseDisc);
         remainItemNet += it.net;
       }
     });
-    const remainItemGross = s.gross - (s.gross / s.total * cancelAmt);
-    const finalAmount = remainItemGross;
-    const needRevoke = s.promoDisc > 0 && finalAmount < (promo.threshold || 0);
-    let hyundaiAmount = finalAmount;
+    const promoApplies = remainItemGross >= (promo.threshold || 0);
+    const needRevoke = !promoApplies && s.promoDisc > 0;
+    const revokeCheckbox = $("#c-revoke-promo");
+    revokeCheckbox.checked = needRevoke;
+    let hyundaiAmount = promoApplies ? Math.round(remainItemGross * s.total / s.gross) : remainItemGross;
+    let finalRefund = needRevoke ? cancelAmt + s.promoDisc : cancelAmt;
     if (needRevoke) {
-      hyundaiAmount = finalAmount * (1 - (s.promoDisc / s.total));
       $("#c-promo-box").style.display = "block";
-      $("#c-promo-msg").innerHTML = `⚠️ <b>프로모션 미적용:</b> 잔여 금액 ${won(finalAmount)}원 < ${won(promo.threshold || 0)}원<br>→ 더현대 POS 재결제: ${won(hyundaiAmount)}원 (원가 기준)`;
+      revokeCheckbox.disabled = false;
+      $("#c-promo-msg").innerHTML = `⚠️ <b>자동 회수:</b> 남은 금액 ${won(remainItemGross)}원 &lt; ${won(promo.threshold || 0)}원<br>→ 프로모션 할인 ${won(s.promoDisc)}원 환수 (필요시 체크 해제)`;
+    } else if (promoApplies && s.promoDisc > 0) {
+      $("#c-promo-box").style.display = "block";
+      revokeCheckbox.disabled = true;
+      revokeCheckbox.checked = false;
+      $("#c-promo-msg").innerHTML = `✓ <b>프로모션 유지:</b> 남은 금액 ${won(remainItemGross)}원 ≥ ${won(promo.threshold || 0)}원`;
     } else {
       $("#c-promo-box").style.display = "none";
     }
-    $("#c-refund").value = cancelAmt;
-    $("#c-refund-display").textContent = won(cancelAmt);
+    revokeCheckbox.addEventListener("change", () => {
+      if (needRevoke) {
+        finalRefund = revokeCheckbox.checked ? cancelAmt + s.promoDisc : cancelAmt;
+        hyundaiAmount = revokeCheckbox.checked ? remainItemGross : Math.round(remainItemGross * s.total / s.gross);
+        $("#c-refund").value = finalRefund;
+        $("#c-refund-display").textContent = won(finalRefund);
+        $("#c-hyundai-display").textContent = won(Math.round(hyundaiAmount));
+      }
+    }, {once: false});
+    $("#c-refund").value = finalRefund;
+    $("#c-refund-display").textContent = won(finalRefund);
     $("#c-hyundai-display").textContent = won(Math.round(hyundaiAmount));
+    const actionMsg = kind === "exchange" ? `【다음 액션】1️⃣ 더현대 ${won(Math.round(hyundaiAmount))} 환불 2️⃣ 판매화면에서 새상품 담기` : `【다음 액션】1️⃣ 더현대 ${won(Math.round(hyundaiAmount))} 환불 2️⃣ 고객에게 ${won(finalRefund)}원 반환`;
+    if (!$("#c-action-info")) {
+      $("#c-promo-box").insertAdjacentHTML("afterend", `<div id="c-action-info" style="margin-top:8px;padding:10px;background:rgba(76,175,80,0.1);border-left:4px solid var(--go);font-weight:bold;font-size:13px">${actionMsg}</div>`);
+    } else {
+      $("#c-action-info").innerHTML = actionMsg;
+    }
   };
   recalc();
   $("#modal-root").addEventListener("change", e => { if (e.target.dataset.cpick !== undefined || e.target.dataset.cqty !== undefined) recalc(); });
